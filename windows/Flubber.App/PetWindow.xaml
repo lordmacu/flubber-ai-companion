@@ -12,5 +12,10 @@
         ResizeMode="NoResize"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
-    <skia:SKElement x:Name="Surface" PaintSurface="OnPaint" />
+    <Grid>
+        <skia:SKElement x:Name="Surface" PaintSurface="OnPaint" />
+        <StackPanel x:Name="Hud" Orientation="Horizontal"
+                    HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Margin="0,2,0,0" Visibility="Collapsed" />
+    </Grid>
 </Window>

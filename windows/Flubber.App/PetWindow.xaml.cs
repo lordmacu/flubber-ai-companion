@@ -9,6 +9,7 @@ using Flubber.Core.AI;
 using Flubber.Core.Agent;
 using Flubber.App.Interop;
 using Flubber.App.Rendering;
+using Controls = System.Windows.Controls;
 using Forms = System.Windows.Forms;
 
 namespace Flubber.App;
@@ -41,6 +42,17 @@ public partial class PetWindow : Window, IPlatformBridge
     private SlimeState? _transient;
     private int _transientUntil;
 
+    // movimiento / física
+    private double _targetX;
+    private bool _walking;
+    private double _walkSpeed = 5;
+    private bool _rolling;
+    private bool _falling;
+    private bool _dragging;
+    private double _vy;
+    private int _wallSide;           // -1 izquierda, +1 derecha, 0 ninguno
+    private int _nextWander = 240;
+
     public PetWindow()
     {
         InitializeComponent();
@@ -72,7 +84,31 @@ public partial class PetWindow : Window, IPlatformBridge
         Left = wa.Left + (wa.Width - Width) / 2;
         Top = wa.Bottom - Height;
         SetupTray();
+        BuildHud();
+        MouseEnter += (_, _) => { if (!_stats.IsDead && _stats.Stage != LifeStage.Egg) Hud.Visibility = Visibility.Visible; };
+        MouseLeave += (_, _) => Hud.Visibility = Visibility.Collapsed;
         _timer.Start();
+    }
+
+    /// <summary>Botones de cuidado que aparecen al pasar el mouse (HUD).</summary>
+    private void BuildHud()
+    {
+        Hud.Children.Clear();
+        Hud.Children.Add(HudButton("🍖", () => { _stats.Feed(Food.Meat); SetTransient(SlimeState.Happy, 24); }));
+        Hud.Children.Add(HudButton("🎮", DoPlay));
+        Hud.Children.Add(HudButton("🛁", () => _stats.Clean()));
+        Hud.Children.Add(HudButton("💊", () => _stats.Medicine()));
+    }
+
+    private Controls.Button HudButton(string emoji, Action onClick)
+    {
+        var b = new Controls.Button
+        {
+            Content = emoji, Width = 30, Height = 30, Margin = new Thickness(2, 0, 2, 0),
+            FontSize = 14, Padding = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand,
+        };
+        b.Click += (_, _) => onClick();
+        return b;
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -106,8 +142,58 @@ public partial class PetWindow : Window, IPlatformBridge
 
         if (_tick >= _nextBlink) { _blinkUntil = _tick + 4; _nextBlink = _tick + _rng.Next(60, 200); }
 
+        UpdateMovement();
         UpdateView();
         Surface.InvalidateVisual();
+    }
+
+    /// <summary>Mueve la ventana: pasear/rodar, caída con gravedad y escurrirse por la pared.</summary>
+    private void UpdateMovement()
+    {
+        if (_dragging) return;
+
+        var wa = SystemParameters.WorkArea;
+        var ground = wa.Bottom - Height;
+        var leftBound = wa.Left;
+        var rightBound = wa.Right - Width;
+
+        if (_stats.IsDead || _stats.Stage == LifeStage.Egg || _stats.IsAsleep)
+        { _walking = _rolling = _falling = false; _wallSide = 0; return; }
+
+        // 1) caída en el aire (tras soltar el arrastre)
+        if (_falling)
+        {
+            _vy += 1.4; Top += _vy;
+            if (Top >= ground) { Top = ground; _falling = false; _vy = 0; }
+            return;
+        }
+
+        // 2) escurrirse por la pared hasta abajo
+        if (_wallSide != 0)
+        {
+            if (Top < ground) Top = Math.Min(ground, Top + 3.0);
+            else _wallSide = 0;
+            return;
+        }
+
+        // 3) paseo / rodar
+        if (_walking || _rolling)
+        {
+            var dir = Math.Sign(_targetX - Left);
+            if (dir == 0) { _walking = _rolling = false; return; }
+            Left += dir * (_rolling ? _walkSpeed * 1.8 : _walkSpeed);
+            _facing = dir >= 0 ? 1 : -1;
+            if (Math.Abs(_targetX - Left) <= _walkSpeed * 1.8) { Left = Math.Clamp(_targetX, leftBound, rightBound); _walking = _rolling = false; }
+            return;
+        }
+
+        // 4) deambular cada cierto tiempo (solo en reposo)
+        if (_transient == null && _tick >= _nextWander && rightBound > leftBound)
+        {
+            _nextWander = _tick + _rng.Next(300, 700);
+            _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound);
+            _walking = true;
+        }
     }
 
     private void UpdateView()
@@ -129,9 +215,16 @@ public partial class PetWindow : Window, IPlatformBridge
             _transient = null;
             if (_stats.IsDead) _view.State = SlimeState.Dead;
             else if (_stats.Stage == LifeStage.Egg) _view.State = SlimeState.Egg;
+            else if (_dragging) _view.State = SlimeState.Dragging;
             else if (_stats.IsAsleep) _view.State = SlimeState.Sleeping;
+            else if (_falling) _view.State = SlimeState.Falling;
+            else if (_wallSide != 0) _view.State = SlimeState.StuckWall;
+            else if (_rolling) _view.State = SlimeState.Rolling;
+            else if (_walking) _view.State = SlimeState.Walking;
             else _view.State = SlimeState.Idle;
         }
+
+        if (_view.State == SlimeState.StuckWall) { _view.ScaleY = 1.30; _view.ScaleX = 0.85; }   // estirado contra la pared
 
         ComputeLook();
         _view.Facing = _facing;
@@ -147,7 +240,11 @@ public partial class PetWindow : Window, IPlatformBridge
             double centerY = (r.Top + r.Bottom) / 2.0;
             _view.LookX = Math.Sign(cxp - centerX);
             _view.LookY = Math.Sign(cyp - centerY);
-            if (cxp < centerX - 20) _facing = -1; else if (cxp > centerX + 20) _facing = 1;
+            // el facing solo lo controla el cursor cuando NO se está moviendo
+            if (!_walking && !_rolling && !_falling && _wallSide == 0)
+            {
+                if (cxp < centerX - 20) _facing = -1; else if (cxp > centerX + 20) _facing = 1;
+            }
         }
         catch { }
     }
@@ -159,7 +256,30 @@ public partial class PetWindow : Window, IPlatformBridge
     private void OnLeftDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2) { DoPlay(); return; }
+        _dragging = true;
         try { DragMove(); } catch { }
+        _dragging = false;
+
+        // al soltar: clamp dentro de la pantalla y decidir física
+        var wa = SystemParameters.WorkArea;
+        var ground = wa.Bottom - Height;
+        var leftBound = wa.Left;
+        var rightBound = wa.Right - Width;
+        Left = Math.Clamp(Left, leftBound, rightBound);
+        _walking = _rolling = false;
+        if (Left <= leftBound + 2) _wallSide = -1;
+        else if (Left >= rightBound - 2) _wallSide = +1;
+        else if (Top < ground - 2) { _falling = true; _vy = 0; }
+    }
+
+    private void StartWalk(bool roll = false)
+    {
+        var wa = SystemParameters.WorkArea;
+        var leftBound = wa.Left;
+        var rightBound = wa.Right - Width;
+        if (rightBound <= leftBound) return;
+        _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound);
+        _walking = !roll; _rolling = roll; _wallSide = 0; _falling = false;
     }
 
     private void OnRightUp(object sender, MouseButtonEventArgs e)
@@ -216,6 +336,7 @@ public partial class PetWindow : Window, IPlatformBridge
         m.Items.Add(new Forms.ToolStripSeparator());
         m.Items.Add(Loc.T("Hablar con Flubber… 💬", "Chat with Flubber… 💬"), null, (_, _) => OpenChat());
         m.Items.Add(Loc.T("Configurar IA… ⚙️", "AI settings… ⚙️"), null, (_, _) => OpenSettings());
+        m.Items.Add(Loc.T("¡Pasea! 🚶", "Walk! 🚶"), null, (_, _) => StartWalk());
         m.Items.Add(Loc.T("Cambiar color 🎨", "Change color 🎨"), null, (_, _) => CycleColor());
 
         var hide = new Forms.ToolStripMenuItem(Loc.T("Ocultar en capturas/grabaciones 🕵️", "Hide from captures/recordings 🕵️"))
@@ -304,8 +425,8 @@ public partial class PetWindow : Window, IPlatformBridge
         switch (accion)
         {
             case "bailar": SetTransient(SlimeState.Dancing, 120); return "¡A bailar! 💃";
-            case "rodar": SetTransient(SlimeState.Dancing, 90); return "¡Rodando! 🤸";
-            case "pasear": return "Me voy a pasear 🚶";
+            case "rodar": StartWalk(roll: true); return "¡Rodando! 🤸";
+            case "pasear": StartWalk(); return "Me voy a pasear 🚶";
             case "feliz": SetTransient(SlimeState.Happy, 60); return "¡Yupi! 😄";
             case "dormir": _stats.IsAsleep = true; return "Zzz 😴";
             case "color":

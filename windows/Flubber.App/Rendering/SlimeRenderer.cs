@@ -2,7 +2,7 @@ using SkiaSharp;
 
 namespace Flubber.App.Rendering;
 
-public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Dead }
+public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead }
 public enum Expr { Normal, Sad, Sick }
 
 /// <summary>Estado de animación que consume el renderer (lo calcula PetWindow cada frame).</summary>
@@ -67,7 +67,8 @@ public sealed class SlimeRenderer
         var height = baseHeight * sy;
         var cx = GW / 2.0 + v.BodyOffsetX;
         const int footY = 3;
-        var jig = v.State is SlimeState.Dragging or SlimeState.Dancing ? 2.0 : 1.0;
+        var jig = v.State is SlimeState.Dragging or SlimeState.Dancing or SlimeState.Walking
+            or SlimeState.Rolling or SlimeState.Falling or SlimeState.StuckWall ? 2.0 : 1.0;
 
         var h = (int)Math.Max(1, height);
         for (var gy = 0; gy < h; gy++)
@@ -127,7 +128,9 @@ public sealed class SlimeRenderer
         {
             case SlimeState.Sleeping: EyeClosed(leftX); EyeClosed(rightX); break;
             case SlimeState.Happy: EyeHappy(leftX); EyeHappy(rightX); break;
-            case SlimeState.Dragging: EyeSurprised(leftX); EyeSurprised(rightX); break;
+            case SlimeState.Dragging:
+            case SlimeState.Falling:
+            case SlimeState.StuckWall: EyeSurprised(leftX); EyeSurprised(rightX); break;
             case SlimeState.Dancing:
                 if (v.Tick / 14 % 2 == 0) { EyeHappy(leftX); EyeHappy(rightX); } else { EyeOpen(leftX); EyeOpen(rightX); }
                 break;
@@ -140,7 +143,7 @@ public sealed class SlimeRenderer
         }
 
         // boca
-        if (v.State == SlimeState.Dragging)
+        if (v.State is SlimeState.Dragging or SlimeState.Falling or SlimeState.StuckWall)
         {
             for (var oy = 0; oy < 3; oy++) for (var ox = 0; ox < 2; ox++) Fill(cx - 1 + ox, faceY - 4 + oy, Palette.Mouth);
         }
