@@ -6,10 +6,65 @@
 <title>Flubber — AI slime desktop pet for macOS &amp; Windows</title>
 <meta name="description" content="Flubber is a pixel-art AI slime desktop pet for macOS and Windows: a real-time Tamagotchi plus an AI agent that sees your screen, controls your browser and chats — and stays invisible in screenshots and screen shares." />
 <link rel="icon" type="image/png" href="icon.png" />
-<meta property="og:title" content="Flubber — AI slime desktop pet" />
-<meta property="og:description" content="A real-time Tamagotchi + AI agent that sees your screen and stays invisible in screen shares. macOS & Windows." />
+<link rel="canonical" href="https://lordmacu.github.io/flubber-ai-companion/" />
+<meta name="keywords" content="desktop pet, AI desktop pet, slime pet, Tamagotchi, virtual pet, AI agent, macOS desktop pet, Windows desktop pet, screen share invisible, pixel art pet, MiniMax, Claude, ChatGPT, DeepSeek, menu bar pet, system tray pet, Flubber" />
+<meta name="author" content="Cristian Garcia" />
+<meta name="robots" content="index, follow, max-image-preview:large" />
+<meta name="theme-color" content="#3FC97C" />
+<meta property="og:title" content="Flubber — AI slime desktop pet for macOS & Windows" />
+<meta property="og:description" content="A real-time Tamagotchi + AI agent that sees your screen, controls your browser and stays invisible in screenshots & screen shares. macOS & Windows, free & open source." />
 <meta property="og:image" content="https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/icon.png" />
+<meta property="og:image:width" content="1024" />
+<meta property="og:image:height" content="1024" />
+<meta property="og:url" content="https://lordmacu.github.io/flubber-ai-companion/" />
+<meta property="og:site_name" content="Flubber" />
 <meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Flubber — AI slime desktop pet for macOS & Windows" />
+<meta name="twitter:description" content="A real-time Tamagotchi + AI agent that sees your screen and stays invisible in screen shares. Free & open source." />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/icon.png" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Flubber",
+  "alternateName": "Flubber AI slime desktop pet",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "macOS 12+, Windows 10/11",
+  "description": "Flubber is a pixel-art AI slime desktop pet for macOS and Windows: a real-time Tamagotchi plus an AI agent that sees your screen, controls your browser and chats, and stays invisible in screenshots and screen shares.",
+  "url": "https://lordmacu.github.io/flubber-ai-companion/",
+  "downloadUrl": "https://github.com/lordmacu/flubber-ai-companion/releases/latest",
+  "softwareVersion": "1.3.0",
+  "image": "https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/icon.png",
+  "screenshot": "https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/chat.png",
+  "author": { "@type": "Person", "name": "Cristian Garcia" },
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "featureList": [
+    "Real-time Tamagotchi (hunger, energy, happiness, cleanliness, health)",
+    "AI agent with streaming chat and tools",
+    "Screen capture and vision (see what's on your screen)",
+    "Browser control via Chrome DevTools Protocol",
+    "Invisible in screenshots and screen shares",
+    "Pixel-art rendering drawn entirely in code",
+    "Works with MiniMax, Claude, ChatGPT and DeepSeek"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "What is Flubber?", "acceptedAnswer": { "@type": "Answer", "text": "Flubber is a free, open-source pixel-art desktop pet for macOS and Windows. It is a real-time Tamagotchi and an AI agent that can search the web, see your screen, control your browser and chat with you." } },
+    { "@type": "Question", "name": "Is Flubber really invisible during screen sharing?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Flubber's window is excluded from screenshots, screen recordings and screen sharing (Google Meet, Zoom, QuickTime) by default, using WDA_EXCLUDEFROMCAPTURE on Windows and sharingType on macOS. You can toggle it off anytime." } },
+    { "@type": "Question", "name": "Which platforms does Flubber support?", "acceptedAnswer": { "@type": "Answer", "text": "macOS 12 or newer and Windows 10/11. The macOS app is built in Swift/AppKit; the Windows app is a C#/.NET (WPF) port with functional parity." } },
+    { "@type": "Question", "name": "Which AI providers does Flubber work with?", "acceptedAnswer": { "@type": "Answer", "text": "Flubber is designed primarily for MiniMax but also works with Claude (Anthropic), ChatGPT (OpenAI) and DeepSeek. Without an API key it still runs with canned phrases." } },
+    { "@type": "Question", "name": "Is Flubber free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, Flubber is completely free and open source on GitHub." } }
+  ]
+}
+</script>
 <style>
   :root{
     --green:#3FC97C; --green-dark:#239256; --green-light:#E9F9F0;
@@ -85,6 +140,14 @@
   .band h2{color:#06120b}
   .band .cta .btn-ghost{background:rgba(255,255,255,.92);border-color:transparent}
 
+  .faq details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 18px;margin-bottom:12px}
+  .faq summary{cursor:pointer;font-weight:700;padding:14px 0;list-style:none}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::before{content:"＋";color:var(--green-dark);font-weight:700;margin-right:10px}
+  .faq details[open] summary::before{content:"－"}
+  .faq details p{padding:0 0 16px;color:var(--muted);font-size:15px}
+  .faq code{background:#e8f3ec;color:var(--green-dark);padding:1px 6px;border-radius:6px;font-size:13px}
+
   footer{border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px;text-align:center}
   footer a{font-weight:600}
   .note{font-size:12.5px;color:var(--muted);margin-top:8px}
@@ -97,6 +160,7 @@
     <div class="brand"><img src="icon.png" alt="Flubber" /> Flubber</div>
     <div class="nav-links">
       <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
       <a href="#download">Download</a>
       <a class="gh" href="https://github.com/lordmacu/flubber-ai-companion">GitHub ↗</a>
     </div>
@@ -155,6 +219,20 @@
     <div class="shots">
       <img src="menu.png" alt="Flubber right-click menu and speech bubble" />
       <img src="chat.png" alt="Flubber built-in chat panel" />
+    </div>
+  </div>
+</section>
+
+<section class="block" id="faq">
+  <div class="wrap" style="max-width:760px">
+    <h2>FAQ</h2>
+    <p class="lead">Quick answers about Flubber, the AI desktop pet.</p>
+    <div class="faq">
+      <details open><summary>What is Flubber?</summary><p>Flubber is a free, open-source pixel-art desktop pet for macOS and Windows. It's a real-time Tamagotchi <em>and</em> an AI agent that can search the web, see your screen, control your browser and chat with you.</p></details>
+      <details><summary>Is Flubber really invisible during screen sharing?</summary><p>Yes. Flubber's window is excluded from screenshots, screen recordings and screen sharing (Google Meet, Zoom, QuickTime) by default — using <code>WDA_EXCLUDEFROMCAPTURE</code> on Windows and window <code>sharingType</code> on macOS. There's a one-click toggle to turn it off.</p></details>
+      <details><summary>Which platforms does Flubber support?</summary><p>macOS 12+ and Windows 10/11. The macOS app is built in Swift/AppKit; the Windows app is a C#/.NET (WPF) port with functional parity.</p></details>
+      <details><summary>Which AI providers does it work with?</summary><p>Designed primarily for <strong>MiniMax</strong>, and also compatible with <strong>Claude</strong> (Anthropic), <strong>ChatGPT</strong> (OpenAI) and <strong>DeepSeek</strong>. Without an API key it still runs with canned phrases.</p></details>
+      <details><summary>Is Flubber free?</summary><p>Yes — completely free and open source on <a href="https://github.com/lordmacu/flubber-ai-companion">GitHub</a>.</p></details>
     </div>
   </div>
 </section>

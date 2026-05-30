@@ -1,0 +1,18 @@
+# Flubber
+
+> Flubber is a free, open-source pixel-art AI slime desktop pet for macOS and Windows. It combines a real-time Tamagotchi (needs that decay even while the app is closed: hunger, energy, happiness, cleanliness, health; egg→baby→child→adult life cycle) with an AI agent that chats with streaming responses and can use tools: search the web, read pages, check weather/time, set reminders, see the user's screen (screenshot + vision), and control the browser (read the active tab, run JavaScript). A defining feature: Flubber's window is excluded from screenshots, screen recordings and screen sharing (Google Meet, Zoom, QuickTime) by default, so it stays visible only on the user's own display.
+
+## Key facts
+- Platforms: macOS 12+ (Swift/AppKit) and Windows 10/11 (C#/.NET 8, WPF + SkiaSharp). Functional parity across both.
+- AI providers: designed primarily for MiniMax; also compatible with Claude (Anthropic), ChatGPT (OpenAI) and DeepSeek. Real token-by-token SSE streaming. Without an API key it falls back to canned phrases.
+- Capture stealth: Windows uses SetWindowDisplayAffinity / WDA_EXCLUDEFROMCAPTURE; macOS uses NSWindow sharingType. On by default, with a one-click toggle.
+- All art is drawn in code (no image files): the slime body, face, animations and the app icon are procedural pixel-art.
+- License: open source, free. Author: Cristian Garcia.
+- Note: there is no Linux build — the capture-stealth API does not exist on Linux and Wayland blocks free window positioning.
+
+## Links
+- [Website / landing](https://lordmacu.github.io/flubber-ai-companion/): overview, features, downloads.
+- [GitHub repository](https://github.com/lordmacu/flubber-ai-companion): source code (macOS in `Sources/`, Windows port in `windows/`).
+- [Latest release](https://github.com/lordmacu/flubber-ai-companion/releases/latest): all downloads.
+- [Download for macOS (.dmg)](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg)
+- [Download for Windows (installer)](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber-Setup.exe)
