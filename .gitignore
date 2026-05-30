@@ -3,7 +3,8 @@
 *.app.zip
 *.dmg
 dmg-stage/
-dmg/background.png        # se regenera con dmg/make-bg.swift
+# se regenera con dmg/make-bg.swift
+dmg/background.png
 build/
 .DS_Store
 
