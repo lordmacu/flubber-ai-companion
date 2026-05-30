@@ -140,6 +140,71 @@ public sealed class ChatWindow : Window
         return tb;
     }
 
+    // ---- API para la escucha de reunión (se llama desde PetWindow, en el hilo UI) ----
+
+    /// <summary>Empieza una conversación NUEVA con un título dado (para cada reunión/charla).</summary>
+    public void StartConversation(string title)
+    {
+        _conv = Conversation.New();
+        _conv.Title = title;
+        _store.Conversations.Add(_conv);
+        _store.Save();
+        _messages.Children.Clear();
+        _agent.Reset();
+        _status.Text = "";
+    }
+
+    /// <summary>Añade un mensaje del slime y lo persiste.</summary>
+    public void AppendAssistant(string text)
+    {
+        AddBubble("assistant", text);
+        _conv.Messages.Add(new Msg { Role = "assistant", Content = text });
+        _store.Save();
+    }
+
+    /// <summary>Añade una burbuja clicable que abre un archivo (la transcripción) y la persiste.</summary>
+    public void AppendFileLink(string label, string filePath)
+    {
+        var tb = new Controls.TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = Media.Brushes.Black, FontWeight = FontWeights.SemiBold };
+        var border = new Controls.Border
+        {
+            Background = new Media.SolidColorBrush(Media.Color.FromRgb(0xDD, 0xF3, 0xE3)),
+            BorderBrush = new Media.SolidColorBrush(Media.Color.FromRgb(0x36, 0xC4, 0x6E)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(10, 7, 10, 7),
+            Margin = new Thickness(0, 4, 0, 4),
+            MaxWidth = 320,
+            HorizontalAlignment = WpfAlign.Left,
+            Cursor = System.Windows.Input.Cursors.Hand,
+            Child = tb,
+        };
+        border.MouseLeftButtonUp += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = filePath, UseShellExecute = true }); }
+            catch { }
+        };
+        _messages.Children.Add(border);
+        _scroll.ScrollToEnd();
+        _conv.Messages.Add(new Msg { Role = "assistant", Content = label, FilePath = filePath });
+        _store.Save();
+    }
+
+    /// <summary>Crea una burbuja vacía del slime para ir llenándola en streaming.</summary>
+    public Controls.TextBlock BeginStreamingAssistant() => AddBubble("assistant", "");
+
+    /// <summary>Actualiza el texto de la burbuja en streaming (sin persistir aún).</summary>
+    public void UpdateStreaming(Controls.TextBlock tb, string text) { tb.Text = text; _scroll.ScrollToEnd(); }
+
+    /// <summary>Fija el texto final de la burbuja en streaming y lo persiste.</summary>
+    public void CommitStreaming(Controls.TextBlock tb, string finalText)
+    {
+        tb.Text = finalText;
+        _conv.Messages.Add(new Msg { Role = "assistant", Content = finalText });
+        _store.Save();
+        _scroll.ScrollToEnd();
+    }
+
     private async Task SendAsync()
     {
         if (_busy) return;

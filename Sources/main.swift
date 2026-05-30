@@ -95,6 +95,7 @@ enum PetState {
     case eating, bathing, takingMedicine    // acciones de cuidado
     case egg, hatching, dead                 // ciclo de vida
     case stuckWall                           // pegado a un costado, escurriéndose
+    case wiggling, stretching                // animaciones espontáneas (contoneo / estirarse)
 }
 
 // MARK: - Partículas
@@ -176,10 +177,12 @@ final class PetView: NSView {
     var chatStick = true                // pegado al fondo (autoscroll)
     var chatScrollToBottom = false      // al abrir/cambiar de conversación: salta al final absoluto
     // --- escucha de reunión: resúmenes rodantes por lotes ---
-    var meetingConvId: String? = nil           // conversación dedicada a la reunión actual
+    var meetingConvId: String? = nil           // conversación dedicada (se crea al vuelo, nueva por sesión)
     var meetingSummarizedLen = 0               // cuánto transcript ya se resumió
     var meetingRollingSummaries: [String] = [] // mini-resúmenes acumulados
     var meetingRollTimer: Timer?               // dispara un mini-resumen cada X tiempo
+    var meetingStartedAt = Date()              // para decidir si fue "reunión" (>1 min) o "charla"
+    static let meetingThreshold: TimeInterval = 60   // ≥60s = reunión; si no, charla
     var chatContentH: CGFloat = 0       // alto del contenido (para clamping del scroll)
     var chatAreaH: CGFloat = 0
     var chatMouse: NSPoint = .zero       // posición del mouse dentro del chat (para hover)
@@ -363,11 +366,20 @@ final class PetView: NSView {
             } else {
                 lookAtMouse(win)
             }
-            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento
-            if stateTimer > 60 && !hovering && !chatOpen && !listening {
-                let r = Int.random(in: 0..<100)
-                if r < 3 && stats.energy > 0.3 { startWalking(in: screen) }
-                else if r == 4 && stats.mood > 0.6 { enter(.dancing) }
+            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento.
+            // Variedad de animaciones espontáneas según ánimo/energía.
+            if stateTimer > 50 && !hovering && !chatOpen && !listening {
+                switch Int.random(in: 0..<150) {
+                case 0..<3:  if stats.energy > 0.3 { startWalking(in: screen) }      // pasear
+                case 3:      if stats.mood > 0.6 { enter(.dancing) }                 // bailar
+                case 4...6:  enter(.looking)                                         // mirar alrededor
+                case 7:      enter(.wiggling)                                        // contonearse
+                case 8:      if stats.energy < 0.55 { enter(.stretching) }           // estirarse
+                case 9:      if stats.energy > 0.4 { enter(.rolling) }               // rodar
+                case 10:     if stats.mood > 0.7 { enter(.happy) }                   // brincar contento
+                case 11:     if stats.mood > 0.5 { enter(.chasing) }                 // perseguir el cursor
+                default:     break
+                }
             }
             maybeBlink()
 
@@ -490,6 +502,15 @@ final class PetView: NSView {
         case .sleeping:
             idleFrames += 1
             if stateTimer % 26 == 0 { spawn(kind: 3, n: 1) }
+
+        case .wiggling:
+            // contoneo en el sitio; ojos felices
+            if stateTimer == 4 { spawn(kind: 0, n: 1) }     // un corazoncito
+            if stateTimer > 38 { enter(.idle) }
+
+        case .stretching:
+            // estirarse como gato y volver
+            if stateTimer > 42 { enter(.idle) }
         }
 
         if squashLanding > 0 { squashLanding = max(0, squashLanding - 0.08) }
@@ -615,6 +636,10 @@ final class PetView: NSView {
         case .stuckWall: sx = 0.74 + sin(CGFloat(tick)*0.3)*0.03   // aplastado contra la pared
         case .reacting: sx = 0.92
         case .yawning:  sx = 1 - min(1,CGFloat(stateTimer)/20)*0.12
+        case .wiggling: sx = 1 + sin(CGFloat(stateTimer)*0.6)*0.06
+        case .stretching:                                    // se estira hacia arriba (se adelgaza)
+            let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
+            sx = 1 - p*0.18
         default:        sx = 1 + sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
@@ -640,6 +665,10 @@ final class PetView: NSView {
         case .stuckWall: sy = 1.30                                  // estirado verticalmente al escurrir
         case .reacting: sy = 1.10
         case .yawning:  sy = 1 + min(1,CGFloat(stateTimer)/20)*0.20
+        case .wiggling: sy = 1 - sin(CGFloat(stateTimer)*0.6)*0.05
+        case .stretching:                                    // se estira hacia arriba
+            let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
+            sy = 1 + p*0.28
         default:        sy = 1 - sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
@@ -777,7 +806,8 @@ final class PetView: NSView {
         // ojos según estado / ánimo
         switch state {
         case .sleeping, .yawning, .takingMedicine: eyeClosed(leftX); eyeClosed(rightX)
-        case .happy: eyeHappy(leftX); eyeHappy(rightX)
+        case .happy, .wiggling: eyeHappy(leftX); eyeHappy(rightX)
+        case .stretching: eyeClosed(leftX); eyeClosed(rightX)
         case .dizzy: eyeDizzy(leftX); eyeDizzy(rightX)
         case .eating: eyeHappy(leftX); eyeHappy(rightX)
         case .reacting, .falling, .dragging: eyeSurprised(leftX); eyeSurprised(rightX)
@@ -1279,25 +1309,37 @@ final class PetView: NSView {
     // lotes + síntesis final + transcripción guardada con link clicable.
     // ==================================================================
 
-    /// Al empezar a escuchar: crea una conversación dedicada y arranca el timer
-    /// de resúmenes parciales (cada ~4 min resume el trozo nuevo).
-    func beginMeetingConversation() {
+    /// Al empezar a escuchar: NO crea conversación todavía (se crea al final según
+    /// la duración). Fuerza sesión nueva (meetingConvId = nil) para no adjuntar a la
+    /// reunión anterior, y arranca el timer de resúmenes parciales.
+    func beginMeeting() {
         guard #available(macOS 13.0, *) else { return }
-        let df = DateFormatter(); df.dateFormat = "HH:mm"
-        let title = Loc.t("🎧 Reunión \(df.string(from: Date()))", "🎧 Meeting \(df.string(from: Date()))")
-        let conv = Conversation(id: UUID().uuidString, title: title, messages: [])
-        chatStore.conversations.append(conv)
-        meetingConvId = conv.id
-        convIndex = chatStore.conversations.count - 1
+        meetingConvId = nil                    // ← cada escucha es una sesión NUEVA
         meetingSummarizedLen = 0
         meetingRollingSummaries = []
-        chatStore.save(); persistActiveConversation(); ensureAgent()
+        meetingStartedAt = Date()
 
         meetingRollTimer?.invalidate()
         meetingRollTimer = Timer.scheduledTimer(withTimeInterval: 240, repeats: true) { [weak self] _ in
             self?.rollMeetingSummary()
         }
-        Log.write("📝 reunión iniciada — conversación dedicada creada")
+        Log.write("📝 escucha iniciada")
+    }
+
+    /// Crea (una sola vez por sesión) la conversación dedicada, con título según
+    /// sea reunión (🎧) o charla (💬).
+    private func ensureMeetingConversation(isMeeting: Bool) {
+        guard meetingConvId == nil else { return }
+        let df = DateFormatter(); df.dateFormat = "HH:mm"
+        let stamp = df.string(from: Date())
+        let title = isMeeting
+            ? Loc.t("🎧 Reunión \(stamp)", "🎧 Meeting \(stamp)")
+            : Loc.t("💬 Charla \(stamp)", "💬 Talk \(stamp)")
+        let conv = Conversation(id: UUID().uuidString, title: title, messages: [])
+        chatStore.conversations.append(conv)
+        meetingConvId = conv.id
+        convIndex = chatStore.conversations.count - 1
+        chatStore.save(); persistActiveConversation(); ensureAgent()
     }
 
     /// Añade un mensaje del slime a la conversación de la reunión (por id).
@@ -1318,8 +1360,9 @@ final class PetView: NSView {
         let new = String(full.dropFirst(start)).trimmingCharacters(in: .whitespacesAndNewlines)
         guard new.count >= 40, let client = client, client.config.isConfigured else { completion?(); return }
         meetingSummarizedLen = full.count
-        let sys = Loc.t("Resume en 1-2 frases muy breves lo NUEVO de esta reunión. Solo el contenido esencial, sin preámbulos. Español.",
-                        "Summarize in 1-2 very short sentences the NEW part of this meeting. Only essential content, no preamble. English.")
+        let sys = Loc.t(
+            "Anota en UNA sola frase corta y neutral SOLO de qué se está hablando ahora. NO saludes, NO te presentes, NO uses emojis ni opiniones. Solo el tema o dato. Español.",
+            "Note in ONE short neutral sentence ONLY what is being talked about now. NO greetings, NO introducing yourself, NO emojis or opinions. Just the topic or fact. English.")
         client.chat(system: sys, history: [], user: new, maxTokens: 220) { [weak self] reply in
             DispatchQueue.main.async {
                 guard let self = self else { completion?(); return }
@@ -1327,6 +1370,7 @@ final class PetView: NSView {
                 if !mini.isEmpty {
                     self.meetingRollingSummaries.append(mini)
                     Log.write("📝 resumen parcial #\(self.meetingRollingSummaries.count): \(mini.prefix(60))")
+                    self.ensureMeetingConversation(isMeeting: true)       // a estas alturas (>4min) ya es reunión
                     self.appendToMeetingConversation("🎧 " + mini)        // partial en vivo (en su conversación)
                     self.say(Loc.t("🎧 anoté algo de la reunión…", "🎧 jotted down something…"))
                 }
@@ -1346,12 +1390,12 @@ final class PetView: NSView {
     private func finalizeMeetingSummary() {
         let transcript = MeetingListener.shared.fullText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filePath = saveTranscriptFile(transcript)
-        Log.write("📝 finalize — transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count), file=\(filePath != nil)")
+        let elapsed = Date().timeIntervalSince(meetingStartedAt)
+        let isMeeting = elapsed >= PetView.meetingThreshold     // ≥1 min = reunión; si no, charla
+        Log.write("📝 finalize — \(Int(elapsed))s, \(isMeeting ? "reunión" : "charla"), transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count)")
 
-        // Lleva el chat a la conversación de la reunión y ábrelo.
-        if let id = meetingConvId, let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) {
-            convIndex = idx; ensureAgent(); persistActiveConversation()
-        }
+        // Crea la conversación dedicada (título según reunión/charla) y abre el chat.
+        ensureMeetingConversation(isMeeting: isMeeting)
         if !chatActive { toggleChat() }
         chatScrollToBottom = true
 
@@ -1372,12 +1416,24 @@ final class PetView: NSView {
             ? transcript
             : meetingRollingSummaries.map { "- \($0)" }.joined(separator: "\n")
 
+        // Reunión (≥1min): frase de cierre + resumen estructurado. Charla (<1min):
+        // solo un resumen corto, sin frase de cierre ni estructura.
+        if isMeeting {
+            appendToMeetingConversation(Loc.t("✅ Ya terminé de escuchar. Este fue tu resumen:", "✅ Done listening. Here's your summary:"))
+        }
         chatBusy = true; chatStick = true; chatScrollToBottom = true; streamLive = ""; stepLines = []; chatActivity = 0; needsDisplay = true
-        let sys = Loc.t(
-            "Eres \(stats.displayName), una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
-            "You are \(stats.displayName), a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
-        let userMsg = Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
-                            "Here's what I heard in the meeting (may have errors):\n\n") + basis
+        let sys = isMeeting
+            ? Loc.t(
+                "Resume lo que se dijo en una reunión, directo y claro. NO saludes ni te presentes ni hables de ti. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
+                "Summarize what was said in a meeting, direct and clear. Do NOT greet or introduce yourself. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
+            : Loc.t(
+                "Resume en 1-2 frases lo que se habló, directo. NO saludes ni te presentes ni hables de ti. Solo el resumen. Español.",
+                "Summarize in 1-2 sentences what was talked about, direct. Do NOT greet or introduce yourself. Just the summary. English only.")
+        let userMsg = isMeeting
+            ? Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
+                    "Here's what I heard in the meeting (may have errors):\n\n") + basis
+            : Loc.t("Esto es lo que escuché en la conversación (puede tener errores):\n\n",
+                    "Here's what I heard in the conversation (may have errors):\n\n") + basis
         let msgs = [AIMessage(role: "system", content: sys), AIMessage(role: "user", content: userMsg)]
 
         client.completeStream(messages: msgs, tools: nil, maxTokens: 1200, onDelta: { [weak self] chunk in
@@ -1463,6 +1519,7 @@ final class PetView: NSView {
 
     /// Desplazamiento horizontal del cuerpo (vaivén al buscar).
     func bodyOffsetX() -> CGFloat {
+        if state == .wiggling { return sin(CGFloat(stateTimer) * 0.6) * 3.0 }   // contoneo lateral
         guard chatActive && chatBusy else { return 0 }
         if chatActivity == 1 { return sin(CGFloat(tick) * 0.32) * 3.5 }   // buscando: vaivén
         if chatActivity == 2 { return sin(CGFloat(tick) * 0.2) * 1.5 }    // mirando: leve
@@ -2170,10 +2227,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(hideItem)
         menu.addItem(NSMenuItem(title: Loc.t("Idioma: English 🌐", "Language: Español 🌐"), action: #selector(toggleLang), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: Loc.t("¡Pasea!", "Walk!"), action: #selector(walkNow), keyEquivalent: "w"))
-        menu.addItem(NSMenuItem(title: Loc.t("Persíguelo", "Chase cursor"), action: #selector(chaseNow), keyEquivalent: "c"))
-        menu.addItem(NSMenuItem(title: Loc.t("¡Baila! 💃", "Dance! 💃"), action: #selector(danceNow), keyEquivalent: "d"))
-        menu.addItem(NSMenuItem(title: Loc.t("¡Rueda! 🤸", "Roll! 🤸"), action: #selector(rollNow), keyEquivalent: "r"))
+        // Submenú con todas las animaciones
+        let animItem = NSMenuItem(title: Loc.t("Animaciones 🎭", "Animations 🎭"), action: nil, keyEquivalent: "")
+        let animMenu = NSMenu()
+        let anims: [(String, String, Selector, String)] = [
+            ("¡Pasea! 🚶", "Walk! 🚶", #selector(walkNow), "w"),
+            ("Persíguelo 🏃", "Chase cursor 🏃", #selector(chaseNow), "c"),
+            ("¡Baila! 💃", "Dance! 💃", #selector(danceNow), "d"),
+            ("¡Rueda! 🤸", "Roll! 🤸", #selector(rollNow), "r"),
+            ("¡Salta! ⤴️", "Jump! ⤴️", #selector(jumpNow), ""),
+            ("Contonéate 🪩", "Wiggle 🪩", #selector(wiggleNow), ""),
+            ("Estírate 🙆", "Stretch 🙆", #selector(stretchNow), ""),
+            ("Maréate 😵‍💫", "Spin 😵‍💫", #selector(spinNow), ""),
+            ("Bosteza 🥱", "Yawn 🥱", #selector(yawnNow), ""),
+        ]
+        for (es, en, sel, key) in anims {
+            let it = NSMenuItem(title: Loc.t(es, en), action: sel, keyEquivalent: key)
+            it.target = self; animMenu.addItem(it)
+        }
+        animItem.submenu = animMenu
+        menu.addItem(animItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: Loc.t("Ponerle nombre 🏷️", "Set name 🏷️"), action: #selector(setNameDialog), keyEquivalent: "n"))
         menu.addItem(NSMenuItem(title: Loc.t("Cambiar color 🎨", "Change color 🎨"), action: #selector(cycleColor), keyEquivalent: "k"))
@@ -2206,6 +2279,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func chaseNow() { view.enter(.chasing) }
     @objc func danceNow() { view.enter(.dancing) }
     @objc func rollNow()  { view.enter(.rolling) }
+    @objc func jumpNow()    { view.wakeUp(); view.enter(.happy) }
+    @objc func wiggleNow()  { view.wakeUp(); view.enter(.wiggling) }
+    @objc func stretchNow() { view.wakeUp(); view.enter(.stretching) }
+    @objc func spinNow()    { view.wakeUp(); view.enter(.dizzy) }
+    @objc func yawnNow()    { view.enter(.yawning) }
     @objc func cycleColor() { Pal.index = (Pal.index + 1) % Pal.skins.count; view.stats.skinIndex = Pal.index }
     @objc func restart() { view.doRestart() }
     @objc func toggleLaunchAtLogin() {
@@ -2270,8 +2348,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Log.write("🎧 toggleListen.start callback ok=\(ok) err=\(err ?? "-")")
                     if ok {
                         self?.view.listening = true
-                        self?.view.beginMeetingConversation()      // conversación dedicada + resúmenes rodantes
-                        self?.view.say(Loc.t("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"))
+                        self?.view.beginMeeting()                  // nueva sesión + resúmenes rodantes
+                        self?.view.say(Loc.t("Escuchando… 🎧", "Listening… 🎧"))
                     } else {
                         self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))
                     }
