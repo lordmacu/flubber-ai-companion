@@ -1142,7 +1142,8 @@ final class PetView: NSView {
                 self.pendingShot = b64; self.pendingShotPath = path
                 self.stepLines = ["📸 pantalla adjunta — escribe tu pregunta"]
             } else {
-                self.stepLines = ["⚠️ no pude capturar. Da permiso en Ajustes → Privacidad → Grabación de pantalla."]
+                self.stepLines = [Loc.t("⚠️ Activa Grabación de pantalla para Flubber (te abrí Ajustes) y REINICIA la app.",
+                                        "⚠️ Enable Screen Recording for Flubber (I opened Settings) and RESTART the app.")]
             }
             self.needsDisplay = true
         }

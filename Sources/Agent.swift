@@ -100,7 +100,7 @@ final class Agent {
                 guard let self = self else { return }
                 if let path = path { self.view?.attachShot(path) }      // thumbnail en el chat
                 guard let b64 = b64 else {
-                    completion("No pude capturar la pantalla. Revisa el permiso en Ajustes → Privacidad → Grabación de pantalla."); return
+                    completion("No pude ver la pantalla: activa Grabación de pantalla para Flubber en Ajustes (te lo abrí) y REINICIA la app."); return
                 }
                 self.client.vision(prompt: q, imageBase64: b64) { desc in
                     completion(desc ?? "Capturé la pantalla pero no pude analizarla.")
@@ -310,7 +310,21 @@ enum ScreenCapture {
 
     /// Captura. Si `appHint` coincide con una app, captura SOLO esa ventana; si no, toda la pantalla.
     /// No ocultamos la ventana del slime (sharingType=.none ya la excluye) → sin parpadeo.
+    /// ¿Tenemos permiso real de Grabación de pantalla? (no lo que "diga" Ajustes)
+    static func hasPermission() -> Bool { CGPreflightScreenCaptureAccess() }
+
     static func grab(appHint: String? = nil, excluding window: NSWindow? = nil, completion: @escaping (String?, String?) -> Void) {
+        // Verifica el permiso DE VERDAD; si falta, lo pide y abre el panel correcto.
+        if !CGPreflightScreenCaptureAccess() {
+            DispatchQueue.main.async {
+                _ = CGRequestScreenCaptureAccess()
+                if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                    NSWorkspace.shared.open(u)
+                }
+                completion(nil, nil)
+            }
+            return
+        }
         let targetID = appHint.flatMap { windowID(matching: $0) }
         DispatchQueue.global().async {
             let path = shotsDir.appendingPathComponent(UUID().uuidString + ".jpg").path
