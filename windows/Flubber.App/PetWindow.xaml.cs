@@ -269,50 +269,24 @@ public partial class PetWindow : Window, IPlatformBridge
         System.Windows.Application.Current.Shutdown();
     }
 
-    // ---------------------------------------------------------------- chat mínimo
-    private async void OpenChat()
+    // ---------------------------------------------------------------- chat
+    private ChatWindow? _chat;
+
+    private void OpenChat()
     {
         if (!_cfg.IsConfigured)
         {
-            Notify("Flubber", Loc.T("Configura la IA en config.json (%APPDATA%\\SlimePet).",
-                                    "Set up AI in config.json (%APPDATA%\\SlimePet)."));
+            Notify("Flubber", Loc.T("Primero configura la IA.", "Set up the AI first."));
+            OpenSettings();
             return;
         }
-        var text = ShowPrompt("Flubber", Loc.T("¿Qué quieres decirle a Flubber?", "What do you want to tell Flubber?"));
-        if (text == null) return;
-        SetTransient(SlimeState.Happy, 100000);
-        try
+        if (_chat == null)
         {
-            var reply = await _agent.RunAsync(text, null, _ => { });
-            Notify("Flubber 💬", reply);
+            _chat = new ChatWindow(_agent);
+            _chat.Closed += (_, _) => _chat = null;
+            _chat.Show();
         }
-        catch (Exception ex) { Notify("Flubber", "Error: " + ex.Message); }
-        finally { _transient = null; }
-    }
-
-    private static string? ShowPrompt(string title, string message)
-    {
-        var dlg = new Window
-        {
-            Title = title, Width = 400, Height = 160, ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true,
-        };
-        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(12) };
-        panel.Children.Add(new System.Windows.Controls.TextBlock { Text = message, Margin = new Thickness(0, 0, 0, 8) });
-        var tb = new System.Windows.Controls.TextBox();
-        panel.Children.Add(tb);
-        var ok = new System.Windows.Controls.Button
-        {
-            Content = "OK", Width = 90, Margin = new Thickness(0, 10, 0, 0),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Right, IsDefault = true,
-        };
-        string? result = null;
-        ok.Click += (_, _) => { result = tb.Text; dlg.DialogResult = true; };
-        panel.Children.Add(ok);
-        dlg.Content = panel;
-        tb.Loaded += (_, _) => tb.Focus();
-        dlg.ShowDialog();
-        return string.IsNullOrWhiteSpace(result) ? null : result;
+        _chat.Activate();
     }
 
     // ================================================================ IPlatformBridge
