@@ -142,6 +142,18 @@ public sealed class ChatWindow : Window
 
     // ---- API para la escucha de reunión (se llama desde PetWindow, en el hilo UI) ----
 
+    /// <summary>Empieza una conversación NUEVA con un título dado (para cada reunión/charla).</summary>
+    public void StartConversation(string title)
+    {
+        _conv = Conversation.New();
+        _conv.Title = title;
+        _store.Conversations.Add(_conv);
+        _store.Save();
+        _messages.Children.Clear();
+        _agent.Reset();
+        _status.Text = "";
+    }
+
     /// <summary>Añade un mensaje del slime y lo persiste.</summary>
     public void AppendAssistant(string text)
     {

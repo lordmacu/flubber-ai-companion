@@ -61,6 +61,9 @@ public partial class PetWindow : Window, IPlatformBridge
     private DispatcherTimer? _meetingRollTimer;
     private int _meetingSummarizedLen;
     private readonly List<string> _meetingRollingSummaries = new();
+    private DateTime _meetingStartedAt;
+    private bool _meetingConvStarted;          // la conversación dedicada ya se creó esta sesión
+    private const double MeetingThresholdSec = 60;   // ≥60s = reunión; si no, charla
 
     public PetWindow()
     {
@@ -455,6 +458,19 @@ public partial class PetWindow : Window, IPlatformBridge
         _chat.Activate();
     }
 
+    /// <summary>Crea (una sola vez por sesión) la conversación dedicada, con título según
+    /// sea reunión (🎧) o charla (💬). Garantiza que cada escucha sea una conversación nueva.</summary>
+    private void EnsureMeetingConversation(bool isMeeting)
+    {
+        if (_meetingConvStarted) return;
+        EnsureChatOpen();
+        var stamp = DateTime.Now.ToString("HH:mm");
+        var title = isMeeting ? Loc.T($"🎧 Reunión {stamp}", $"🎧 Meeting {stamp}")
+                              : Loc.T($"💬 Charla {stamp}", $"💬 Talk {stamp}");
+        _chat?.StartConversation(title);
+        _meetingConvStarted = true;
+    }
+
     // ================================================================ escucha de reunión
     private void ToggleListen()
     {
@@ -472,10 +488,12 @@ public partial class PetWindow : Window, IPlatformBridge
         _listening = true;
         _meetingSummarizedLen = 0;
         _meetingRollingSummaries.Clear();
+        _meetingStartedAt = DateTime.UtcNow;
+        _meetingConvStarted = false;            // cada escucha es una sesión NUEVA
         _meetingRollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(240) };
         _meetingRollTimer.Tick += (_, _) => _ = RollMeetingSummaryAsync();
         _meetingRollTimer.Start();
-        Notify("Flubber", Loc.T("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"));
+        Notify("Flubber", Loc.T("Escuchando… 🎧", "Listening… 🎧"));
         _tray.ContextMenuStrip = BuildMenu();
     }
 
@@ -508,7 +526,7 @@ public partial class PetWindow : Window, IPlatformBridge
         Dispatcher.Invoke(() =>
         {
             _meetingRollingSummaries.Add(mini);
-            EnsureChatOpen();
+            EnsureMeetingConversation(isMeeting: true);   // a estas alturas (>4min) ya es reunión
             _chat?.AppendAssistant("🎧 " + mini);
             Notify("Flubber", Loc.T("🎧 anoté algo de la reunión…", "🎧 jotted down something…"));
         });
@@ -522,9 +540,11 @@ public partial class PetWindow : Window, IPlatformBridge
 
         var transcript = MeetingListener.Shared.FullText.Trim();
         var filePath = SaveTranscriptFile(transcript);
-        Log.Write($"📝 finalize — transcript={transcript.Length} chars, partials={_meetingRollingSummaries.Count}, file={(filePath != null)}");
+        var elapsed = (DateTime.UtcNow - _meetingStartedAt).TotalSeconds;
+        var isMeeting = elapsed >= MeetingThresholdSec;     // ≥1 min = reunión; si no, charla
+        Log.Write($"📝 finalize — {(int)elapsed}s, {(isMeeting ? "reunión" : "charla")}, transcript={transcript.Length} chars, partials={_meetingRollingSummaries.Count}");
 
-        EnsureChatOpen();
+        EnsureMeetingConversation(isMeeting);
         if (transcript.Length == 0)
         {
             _chat?.AppendAssistant(Loc.T("No escuché nada claro 👂", "Didn't catch anything clear 👂"));
@@ -542,11 +562,19 @@ public partial class PetWindow : Window, IPlatformBridge
         var basis = _meetingRollingSummaries.Count > 0
             ? string.Join("\n", _meetingRollingSummaries.Select(s => "- " + s))
             : transcript;
-        var sys = Loc.T(
-            $"Eres {_stats.DisplayName}, una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos si los hay. Solo español.",
-            $"You are {_stats.DisplayName}, a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points, 3) action items if any. English only.");
-        var user = Loc.T("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
-                         "Here's what I heard in the meeting (may have errors):\n\n") + basis;
+        // Prompt distinto según fue reunión formal o solo una charla.
+        var sys = isMeeting
+            ? Loc.T(
+                $"Eres {_stats.DisplayName}, una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos si los hay. Solo español.",
+                $"You are {_stats.DisplayName}, a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points, 3) action items if any. English only.")
+            : Loc.T(
+                $"Eres {_stats.DisplayName}, una mascota que escuchó una breve conversación (NO una reunión formal). Cuenta en PRIMERA PERSONA, tierno y breve, de qué se habló. No uses secciones de tareas salvo que claramente las haya; solo un resumen natural. Solo español.",
+                $"You are {_stats.DisplayName}, a pet that overheard a short conversation (NOT a formal meeting). Tell in FIRST PERSON, cute and brief, what was talked about. Don't use action-item sections unless clearly present; just a natural summary. English only.");
+        var user = (isMeeting
+                ? Loc.T("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
+                        "Here's what I heard in the meeting (may have errors):\n\n")
+                : Loc.T("Esto es lo que escuché en la conversación (puede tener errores):\n\n",
+                        "Here's what I heard in the conversation (may have errors):\n\n")) + basis;
         var msgs = new List<AIMessage> { new("system", sys), new("user", user) };
 
         var bubble = _chat?.BeginStreamingAssistant();

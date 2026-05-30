@@ -176,10 +176,12 @@ final class PetView: NSView {
     var chatStick = true                // pegado al fondo (autoscroll)
     var chatScrollToBottom = false      // al abrir/cambiar de conversación: salta al final absoluto
     // --- escucha de reunión: resúmenes rodantes por lotes ---
-    var meetingConvId: String? = nil           // conversación dedicada a la reunión actual
+    var meetingConvId: String? = nil           // conversación dedicada (se crea al vuelo, nueva por sesión)
     var meetingSummarizedLen = 0               // cuánto transcript ya se resumió
     var meetingRollingSummaries: [String] = [] // mini-resúmenes acumulados
     var meetingRollTimer: Timer?               // dispara un mini-resumen cada X tiempo
+    var meetingStartedAt = Date()              // para decidir si fue "reunión" (>1 min) o "charla"
+    static let meetingThreshold: TimeInterval = 60   // ≥60s = reunión; si no, charla
     var chatContentH: CGFloat = 0       // alto del contenido (para clamping del scroll)
     var chatAreaH: CGFloat = 0
     var chatMouse: NSPoint = .zero       // posición del mouse dentro del chat (para hover)
@@ -1279,25 +1281,37 @@ final class PetView: NSView {
     // lotes + síntesis final + transcripción guardada con link clicable.
     // ==================================================================
 
-    /// Al empezar a escuchar: crea una conversación dedicada y arranca el timer
-    /// de resúmenes parciales (cada ~4 min resume el trozo nuevo).
-    func beginMeetingConversation() {
+    /// Al empezar a escuchar: NO crea conversación todavía (se crea al final según
+    /// la duración). Fuerza sesión nueva (meetingConvId = nil) para no adjuntar a la
+    /// reunión anterior, y arranca el timer de resúmenes parciales.
+    func beginMeeting() {
         guard #available(macOS 13.0, *) else { return }
-        let df = DateFormatter(); df.dateFormat = "HH:mm"
-        let title = Loc.t("🎧 Reunión \(df.string(from: Date()))", "🎧 Meeting \(df.string(from: Date()))")
-        let conv = Conversation(id: UUID().uuidString, title: title, messages: [])
-        chatStore.conversations.append(conv)
-        meetingConvId = conv.id
-        convIndex = chatStore.conversations.count - 1
+        meetingConvId = nil                    // ← cada escucha es una sesión NUEVA
         meetingSummarizedLen = 0
         meetingRollingSummaries = []
-        chatStore.save(); persistActiveConversation(); ensureAgent()
+        meetingStartedAt = Date()
 
         meetingRollTimer?.invalidate()
         meetingRollTimer = Timer.scheduledTimer(withTimeInterval: 240, repeats: true) { [weak self] _ in
             self?.rollMeetingSummary()
         }
-        Log.write("📝 reunión iniciada — conversación dedicada creada")
+        Log.write("📝 escucha iniciada")
+    }
+
+    /// Crea (una sola vez por sesión) la conversación dedicada, con título según
+    /// sea reunión (🎧) o charla (💬).
+    private func ensureMeetingConversation(isMeeting: Bool) {
+        guard meetingConvId == nil else { return }
+        let df = DateFormatter(); df.dateFormat = "HH:mm"
+        let stamp = df.string(from: Date())
+        let title = isMeeting
+            ? Loc.t("🎧 Reunión \(stamp)", "🎧 Meeting \(stamp)")
+            : Loc.t("💬 Charla \(stamp)", "💬 Talk \(stamp)")
+        let conv = Conversation(id: UUID().uuidString, title: title, messages: [])
+        chatStore.conversations.append(conv)
+        meetingConvId = conv.id
+        convIndex = chatStore.conversations.count - 1
+        chatStore.save(); persistActiveConversation(); ensureAgent()
     }
 
     /// Añade un mensaje del slime a la conversación de la reunión (por id).
@@ -1327,6 +1341,7 @@ final class PetView: NSView {
                 if !mini.isEmpty {
                     self.meetingRollingSummaries.append(mini)
                     Log.write("📝 resumen parcial #\(self.meetingRollingSummaries.count): \(mini.prefix(60))")
+                    self.ensureMeetingConversation(isMeeting: true)       // a estas alturas (>4min) ya es reunión
                     self.appendToMeetingConversation("🎧 " + mini)        // partial en vivo (en su conversación)
                     self.say(Loc.t("🎧 anoté algo de la reunión…", "🎧 jotted down something…"))
                 }
@@ -1346,12 +1361,12 @@ final class PetView: NSView {
     private func finalizeMeetingSummary() {
         let transcript = MeetingListener.shared.fullText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filePath = saveTranscriptFile(transcript)
-        Log.write("📝 finalize — transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count), file=\(filePath != nil)")
+        let elapsed = Date().timeIntervalSince(meetingStartedAt)
+        let isMeeting = elapsed >= PetView.meetingThreshold     // ≥1 min = reunión; si no, charla
+        Log.write("📝 finalize — \(Int(elapsed))s, \(isMeeting ? "reunión" : "charla"), transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count)")
 
-        // Lleva el chat a la conversación de la reunión y ábrelo.
-        if let id = meetingConvId, let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) {
-            convIndex = idx; ensureAgent(); persistActiveConversation()
-        }
+        // Crea la conversación dedicada (título según reunión/charla) y abre el chat.
+        ensureMeetingConversation(isMeeting: isMeeting)
         if !chatActive { toggleChat() }
         chatScrollToBottom = true
 
@@ -1373,11 +1388,19 @@ final class PetView: NSView {
             : meetingRollingSummaries.map { "- \($0)" }.joined(separator: "\n")
 
         chatBusy = true; chatStick = true; chatScrollToBottom = true; streamLive = ""; stepLines = []; chatActivity = 0; needsDisplay = true
-        let sys = Loc.t(
-            "Eres \(stats.displayName), una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
-            "You are \(stats.displayName), a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
-        let userMsg = Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
-                            "Here's what I heard in the meeting (may have errors):\n\n") + basis
+        // Prompt distinto según fue una reunión formal o solo una charla.
+        let sys = isMeeting
+            ? Loc.t(
+                "Eres \(stats.displayName), una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
+                "You are \(stats.displayName), a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
+            : Loc.t(
+                "Eres \(stats.displayName), una mascota que escuchó una breve conversación (NO una reunión formal). Cuenta en PRIMERA PERSONA, tierno y breve, de qué se habló. No uses secciones de tareas/acuerdos salvo que claramente las haya; solo un resumen natural. Solo español.",
+                "You are \(stats.displayName), a pet that overheard a short conversation (NOT a formal meeting). Tell in FIRST PERSON, cute and brief, what was talked about. Don't use action-item sections unless clearly present; just a natural summary. English only.")
+        let userMsg = isMeeting
+            ? Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
+                    "Here's what I heard in the meeting (may have errors):\n\n") + basis
+            : Loc.t("Esto es lo que escuché en la conversación (puede tener errores):\n\n",
+                    "Here's what I heard in the conversation (may have errors):\n\n") + basis
         let msgs = [AIMessage(role: "system", content: sys), AIMessage(role: "user", content: userMsg)]
 
         client.completeStream(messages: msgs, tools: nil, maxTokens: 1200, onDelta: { [weak self] chunk in
@@ -2270,8 +2293,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Log.write("🎧 toggleListen.start callback ok=\(ok) err=\(err ?? "-")")
                     if ok {
                         self?.view.listening = true
-                        self?.view.beginMeetingConversation()      // conversación dedicada + resúmenes rodantes
-                        self?.view.say(Loc.t("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"))
+                        self?.view.beginMeeting()                  // nueva sesión + resúmenes rodantes
+                        self?.view.say(Loc.t("Escuchando… 🎧", "Listening… 🎧"))
                     } else {
                         self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))
                     }
