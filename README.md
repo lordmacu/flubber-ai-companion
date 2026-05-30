@@ -108,6 +108,10 @@ not a separate window:
 - **Copy** any bubble (⧉ button on hover).
 - While you chat, the slime **doesn't wander** or move the dialog.
 
+<p align="center">
+  <img src="chat.png" alt="Flubber's built-in pixel chat panel" width="340">
+</p>
+
 ### 🤖 Agent with tools
 
 Flubber decides on its own when to use its tools (function calling):
