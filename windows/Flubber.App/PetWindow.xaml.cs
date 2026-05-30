@@ -22,8 +22,8 @@ public partial class PetWindow : Window, IPlatformBridge
 {
     private readonly PetStats _stats;
     private readonly AIConfig _cfg;
-    private readonly IAIBackend _client;
-    private readonly Agent _agent;
+    private IAIBackend _client;
+    private Agent _agent;
 
     private readonly SlimeRenderer _renderer = new();
     private readonly SlimeView _view = new();
@@ -215,6 +215,7 @@ public partial class PetWindow : Window, IPlatformBridge
         m.Items.Add(Loc.T("Dormir / Despertar 💤", "Sleep / Wake 💤"), null, (_, _) => _stats.ToggleSleep());
         m.Items.Add(new Forms.ToolStripSeparator());
         m.Items.Add(Loc.T("Hablar con Flubber… 💬", "Chat with Flubber… 💬"), null, (_, _) => OpenChat());
+        m.Items.Add(Loc.T("Configurar IA… ⚙️", "AI settings… ⚙️"), null, (_, _) => OpenSettings());
         m.Items.Add(Loc.T("Cambiar color 🎨", "Change color 🎨"), null, (_, _) => CycleColor());
 
         var hide = new Forms.ToolStripMenuItem(Loc.T("Ocultar en capturas/grabaciones 🕵️", "Hide from captures/recordings 🕵️"))
@@ -240,6 +241,17 @@ public partial class PetWindow : Window, IPlatformBridge
         Palette.Index = (Palette.Index + 1) % Palette.Skins.Length;
         Palette.ClearAiSkin();
         _stats.SkinIndex = Palette.Index;
+    }
+
+    private void OpenSettings()
+    {
+        var w = new SettingsWindow(_cfg);
+        w.ShowDialog();
+        if (w.Saved)
+        {
+            _client = BackendFactory.Make(_cfg);
+            _agent = new Agent(_client, this);
+        }
     }
 
     private void ToggleLang()
@@ -307,7 +319,7 @@ public partial class PetWindow : Window, IPlatformBridge
     public PetStats Stats => _stats;
 
     public Task<(string? Base64, string? Path)> CaptureScreenAsync(string? appHint)
-        => Task.FromResult<(string?, string?)>((null, null));   // Fase 3: Windows.Graphics.Capture
+        => Flubber.App.Platform.ScreenCapture.CaptureAsync(appHint);
 
     public void AttachShot(string path) { /* Fase 8: thumbnail en el chat */ }
 
