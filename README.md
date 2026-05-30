@@ -189,9 +189,20 @@ User data: `~/Library/Application Support/SlimePet/`
 
 **👉 [Download the latest Flubber.app.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip)** — no need to compile.
 
-1. Download and unzip → drag **Flubber.app** to `/Applications` (or wherever you like).
-2. Open it (lives in the menu bar: 🟢). First launch: if macOS warns it's unverified, allow it in **Settings → Privacy & Security → "Open Anyway"**.
-3. Optional: 🟢 menu → **Launch at login**.
+1. Download and unzip → move **Flubber.app** to `/Applications` (or wherever you like).
+2. **First launch (important):** because the app is downloaded and not notarized by
+   Apple, macOS will show *"Apple could not verify Flubber is free of malware"* with
+   a **Move to Trash** button. **Don't** trash it — open it one of these ways:
+   - **Terminal (easiest):**
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/Flubber.app   # adjust the path
+     open /Applications/Flubber.app
+     ```
+   - **Or via Settings:** click **Done** on the dialog → **System Settings → Privacy & Security** → scroll down → *"Flubber was blocked…"* → **Open Anyway** → confirm → open Flubber again → **Open Anyway**.
+3. It lives in the menu bar (🟢). Optional: 🟢 menu → **Launch at login**.
+
+> This one-time step exists because the app isn't **notarized** (that needs a paid
+> Apple Developer account). After allowing it once, it opens normally.
 
 Every push is also built by **GitHub Actions**
 ([`.github/workflows/build.yml`](.github/workflows/build.yml)); you can grab any
