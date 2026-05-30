@@ -20,6 +20,8 @@ it in a built-in chat.
 
 ### ⬇️ [**Download Flubber.dmg**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg) &nbsp;·&nbsp; [.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) &nbsp;·&nbsp; [all releases](https://github.com/lordmacu/flubber-ai-companion/releases)
 
+> 🪟 **Windows?** A C# / .NET 8 (WPF) port with functional parity lives in [`windows/`](windows/) — same Tamagotchi, AI agent, capture-stealth and 4 providers. Grab the build from [Actions → Artifacts](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/windows-build.yml).
+
 > Open the `.dmg` and **drag Flubber into Applications**. First launch: right-click → **Open** (ad-hoc signed).
 
 > 🕵️ **Invisible on screen captures & screen shares.** Flubber's window does

@@ -24,14 +24,23 @@ windows/
 - [x] WPF app: transparent topmost pet window + pixel-art render (SkiaSharp), system tray + care menu, animation loop, look-at-cursor, drag-to-move, minimal chat. **Builds in CI (windows).**
 - [x] Capture-stealth: `SetWindowDisplayAffinity` / `WDA_EXCLUDEFROMCAPTURE` (on by default, toggle in tray).
 - [x] Platform tools wired via `Agent/IPlatformBridge.cs`: open, run command, reminders, confirmations, control-slime, AI skin.
-- [ ] Real screen capture (`Windows.Graphics.Capture`) — currently stubbed.
-- [ ] Browser control (Chrome DevTools Protocol) — currently stubbed.
-- [ ] Full pixel chat panel + HUD + AI-settings window (parity with macOS).
-- [ ] Extra animations (walk across screen, roll, wall-slide) and toast polish.
-- [ ] Package the `.exe` as a CI artifact / release.
+- [x] Real screen capture (GDI BitBlt — full screen or a specific app/window) feeding the AI vision tool.
+- [x] Browser control via **Chrome DevTools Protocol** (`navegador_url` / `navegador_js`) — needs the browser started with `--remote-debugging-port=9222`.
+- [x] AI-settings window (provider / key / model / test connection) + streaming chat window with persistence.
+- [x] Package the `.exe` (win-x64, self-contained) as a CI artifact (`Flubber-windows`).
+- [ ] Polish: hover HUD of care buttons + extra animations (walk across screen, roll, wall-slide).
 
-The platform-specific tools are abstracted behind `Agent/IPlatformBridge.cs`, implemented by the WPF app
-(`PetWindow.xaml.cs`). Both projects compile in `.github/workflows/windows-build.yml`.
+**Functional parity with macOS reached.** The platform-specific tools are abstracted behind
+`Agent/IPlatformBridge.cs`, implemented by the WPF app (`PetWindow.xaml.cs`). Both projects compile in
+`.github/workflows/windows-build.yml`, which also publishes the Windows `.exe`.
+
+## Download (Windows)
+
+The Windows build is produced on every push that touches `windows/`. Grab `Flubber-windows` (a zip with the
+self-contained `Flubber.exe`) from the latest run's **Artifacts**:
+<https://github.com/lordmacu/flubber-ai-companion/actions/workflows/windows-build.yml>
+
+Requires Windows 10 (2004+) / 11. First run: Windows SmartScreen may warn (unsigned) — "More info" → "Run anyway".
 
 ## Build
 
