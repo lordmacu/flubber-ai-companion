@@ -218,12 +218,22 @@ public partial class PetWindow : Window, IPlatformBridge
             return;
         }
 
-        // 4) deambular cada cierto tiempo (solo en reposo; quieta si escucha)
-        if (_transient == null && !_listening && _tick >= _nextWander && rightBound > leftBound)
+        // 4) animaciones espontáneas cada cierto tiempo (solo en reposo; quieta si escucha)
+        if (_transient == null && !_walking && !_rolling && !_listening && _tick >= _nextWander && rightBound > leftBound)
         {
-            _nextWander = _tick + _rng.Next(300, 700);
-            _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound);
-            _walking = true;
+            _nextWander = _tick + _rng.Next(160, 420);
+            switch (_rng.Next(0, 10))
+            {
+                case 0: case 1: case 2:                                           // pasear
+                    _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound); _walking = true; break;
+                case 3: SetTransient(SlimeState.Dancing, 120); break;            // bailar
+                case 4: SetTransient(SlimeState.Wiggling, 38); break;            // contonearse
+                case 5: SetTransient(SlimeState.Wiggling, 38); break;            // contonearse
+                case 6: SetTransient(SlimeState.Stretching, 42); break;          // estirarse
+                case 7: if (_stats.Mood > 0.6) SetTransient(SlimeState.Happy, 40); break;  // brincar
+                case 8: _rolling = true; _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound); break;  // rodar
+                default: break;                                                  // a veces solo queda quieto
+            }
         }
     }
 
@@ -256,6 +266,21 @@ public partial class PetWindow : Window, IPlatformBridge
         }
 
         if (_view.State == SlimeState.StuckWall) { _view.ScaleY = 1.30; _view.ScaleX = 0.85; }   // estirado contra la pared
+
+        // animaciones espontáneas nuevas
+        _view.BodyOffsetX = 0;
+        if (_view.State == SlimeState.Wiggling)
+        {
+            _view.BodyOffsetX = Math.Sin(_tick * 0.6) * 3.0;          // contoneo lateral
+            _view.ScaleX = 1 + Math.Sin(_tick * 0.6) * 0.06;
+            _view.ScaleY = 1 - Math.Sin(_tick * 0.6) * 0.05;
+        }
+        else if (_view.State == SlimeState.Stretching)
+        {
+            var p = Math.Sin(Math.Clamp((double)(_tick - _transientStart) / Math.Max(1, _transientFrames), 0, 1) * Math.PI);
+            _view.ScaleY = 1 + p * 0.28;                              // se estira hacia arriba
+            _view.ScaleX = 1 - p * 0.18;
+        }
 
         _view.Listening = _listening;
         ComputeLook();
@@ -325,7 +350,9 @@ public partial class PetWindow : Window, IPlatformBridge
         SetTransient(SlimeState.Happy, 30);
     }
 
-    private void SetTransient(SlimeState s, int frames) { _transient = s; _transientUntil = _tick + frames; }
+    private int _transientStart;
+    private int _transientFrames;
+    private void SetTransient(SlimeState s, int frames) { _transient = s; _transientStart = _tick; _transientFrames = frames; _transientUntil = _tick + frames; }
 
     private void HandleEvent(PetEvent ev)
     {

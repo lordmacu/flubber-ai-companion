@@ -2,7 +2,7 @@ using SkiaSharp;
 
 namespace Flubber.App.Rendering;
 
-public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead }
+public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead, Wiggling, Stretching }
 public enum Expr { Normal, Sad, Sick }
 
 /// <summary>Estado de animación que consume el renderer (lo calcula PetWindow cada frame).</summary>
@@ -160,8 +160,10 @@ public sealed class SlimeRenderer
         // ojos según estado / ánimo
         switch (v.State)
         {
-            case SlimeState.Sleeping: EyeClosed(leftX); EyeClosed(rightX); break;
-            case SlimeState.Happy: EyeHappy(leftX); EyeHappy(rightX); break;
+            case SlimeState.Sleeping:
+            case SlimeState.Stretching: EyeClosed(leftX); EyeClosed(rightX); break;
+            case SlimeState.Happy:
+            case SlimeState.Wiggling: EyeHappy(leftX); EyeHappy(rightX); break;
             case SlimeState.Dragging:
             case SlimeState.Falling:
             case SlimeState.StuckWall: EyeSurprised(leftX); EyeSurprised(rightX); break;

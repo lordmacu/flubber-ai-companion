@@ -95,6 +95,7 @@ enum PetState {
     case eating, bathing, takingMedicine    // acciones de cuidado
     case egg, hatching, dead                 // ciclo de vida
     case stuckWall                           // pegado a un costado, escurriéndose
+    case wiggling, stretching                // animaciones espontáneas (contoneo / estirarse)
 }
 
 // MARK: - Partículas
@@ -365,11 +366,20 @@ final class PetView: NSView {
             } else {
                 lookAtMouse(win)
             }
-            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento
-            if stateTimer > 60 && !hovering && !chatOpen && !listening {
-                let r = Int.random(in: 0..<100)
-                if r < 3 && stats.energy > 0.3 { startWalking(in: screen) }
-                else if r == 4 && stats.mood > 0.6 { enter(.dancing) }
+            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento.
+            // Variedad de animaciones espontáneas según ánimo/energía.
+            if stateTimer > 50 && !hovering && !chatOpen && !listening {
+                switch Int.random(in: 0..<150) {
+                case 0..<3:  if stats.energy > 0.3 { startWalking(in: screen) }      // pasear
+                case 3:      if stats.mood > 0.6 { enter(.dancing) }                 // bailar
+                case 4...6:  enter(.looking)                                         // mirar alrededor
+                case 7:      enter(.wiggling)                                        // contonearse
+                case 8:      if stats.energy < 0.55 { enter(.stretching) }           // estirarse
+                case 9:      if stats.energy > 0.4 { enter(.rolling) }               // rodar
+                case 10:     if stats.mood > 0.7 { enter(.happy) }                   // brincar contento
+                case 11:     if stats.mood > 0.5 { enter(.chasing) }                 // perseguir el cursor
+                default:     break
+                }
             }
             maybeBlink()
 
@@ -492,6 +502,15 @@ final class PetView: NSView {
         case .sleeping:
             idleFrames += 1
             if stateTimer % 26 == 0 { spawn(kind: 3, n: 1) }
+
+        case .wiggling:
+            // contoneo en el sitio; ojos felices
+            if stateTimer == 4 { spawn(kind: 0, n: 1) }     // un corazoncito
+            if stateTimer > 38 { enter(.idle) }
+
+        case .stretching:
+            // estirarse como gato y volver
+            if stateTimer > 42 { enter(.idle) }
         }
 
         if squashLanding > 0 { squashLanding = max(0, squashLanding - 0.08) }
@@ -617,6 +636,10 @@ final class PetView: NSView {
         case .stuckWall: sx = 0.74 + sin(CGFloat(tick)*0.3)*0.03   // aplastado contra la pared
         case .reacting: sx = 0.92
         case .yawning:  sx = 1 - min(1,CGFloat(stateTimer)/20)*0.12
+        case .wiggling: sx = 1 + sin(CGFloat(stateTimer)*0.6)*0.06
+        case .stretching:                                    // se estira hacia arriba (se adelgaza)
+            let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
+            sx = 1 - p*0.18
         default:        sx = 1 + sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
@@ -642,6 +665,10 @@ final class PetView: NSView {
         case .stuckWall: sy = 1.30                                  // estirado verticalmente al escurrir
         case .reacting: sy = 1.10
         case .yawning:  sy = 1 + min(1,CGFloat(stateTimer)/20)*0.20
+        case .wiggling: sy = 1 - sin(CGFloat(stateTimer)*0.6)*0.05
+        case .stretching:                                    // se estira hacia arriba
+            let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
+            sy = 1 + p*0.28
         default:        sy = 1 - sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
@@ -779,7 +806,8 @@ final class PetView: NSView {
         // ojos según estado / ánimo
         switch state {
         case .sleeping, .yawning, .takingMedicine: eyeClosed(leftX); eyeClosed(rightX)
-        case .happy: eyeHappy(leftX); eyeHappy(rightX)
+        case .happy, .wiggling: eyeHappy(leftX); eyeHappy(rightX)
+        case .stretching: eyeClosed(leftX); eyeClosed(rightX)
         case .dizzy: eyeDizzy(leftX); eyeDizzy(rightX)
         case .eating: eyeHappy(leftX); eyeHappy(rightX)
         case .reacting, .falling, .dragging: eyeSurprised(leftX); eyeSurprised(rightX)
@@ -1491,6 +1519,7 @@ final class PetView: NSView {
 
     /// Desplazamiento horizontal del cuerpo (vaivén al buscar).
     func bodyOffsetX() -> CGFloat {
+        if state == .wiggling { return sin(CGFloat(stateTimer) * 0.6) * 3.0 }   // contoneo lateral
         guard chatActive && chatBusy else { return 0 }
         if chatActivity == 1 { return sin(CGFloat(tick) * 0.32) * 3.5 }   // buscando: vaivén
         if chatActivity == 2 { return sin(CGFloat(tick) * 0.2) * 1.5 }    // mirando: leve
