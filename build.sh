@@ -32,15 +32,20 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Firma AD-HOC. Es la que deja ABRIR la app sin el bloqueo de Gatekeeper
-# ("no se puede verificar / Abrir de todos modos") que sí ocurre con un
-# certificado de desarrollo no notarizado.
-# Nota: el permiso de Grabación de pantalla SÍ sobrevive a reinicios del Mac;
-# solo se reinicia si se RECOMPILA la app (cambia la huella ad-hoc).
-# (Para forzar otra identidad: FLUBBER_SIGN_ID=<hash> ./build.sh)
-SIGN_ID="${FLUBBER_SIGN_ID:--}"
-codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
-  || codesign --force --deep --sign - "$APP" 2>/dev/null || true
+# Firma: si hay una identidad estable (certificado de desarrollo) en el llavero,
+# úsala — así el permiso de Grabación de pantalla SE QUEDA (TCC lo ancla a la
+# identidad, no a la huella del binario). Requiere un único "Abrir de todos modos"
+# en Ajustes la primera vez (Gatekeeper, por no estar notarizada).
+# En CI (sin certificado) cae a firma ad-hoc automáticamente.
+SIGN_ID="${FLUBBER_SIGN_ID:-A3ADB32024EDBDC374BE1075BC8189E037245868}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  echo "🔏 Firma estable (el permiso de pantalla persistirá; pide 'Abrir de todos modos' una vez)."
+  codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
+    || codesign --force --deep --sign - "$APP" 2>/dev/null || true
+else
+  echo "🔏 Firma ad-hoc (CI)."
+  codesign --force --deep --sign - "$APP" 2>/dev/null || true
+fi
 
 # Quita la "cuarentena" para que Gatekeeper no lo bloquee (app local).
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
