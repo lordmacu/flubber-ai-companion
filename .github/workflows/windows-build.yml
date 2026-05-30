@@ -46,3 +46,15 @@ jobs:
           name: Flubber-windows
           path: Flubber-win-x64.zip
           if-no-files-found: error
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppSrc="$PWD\publish" /DOutDir="$PWD" windows\installer\Flubber.iss
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Flubber-installer
+          path: Flubber-Setup.exe
+          if-no-files-found: error

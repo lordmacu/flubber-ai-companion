@@ -3,3 +3,9 @@ bin/
 obj/
 *.user
 .vs/
+
+# packaging output
+publish/
+*.zip
+installer/out/
+Flubber-Setup.exe
