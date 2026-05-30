@@ -2,6 +2,12 @@
   <img src="icon/icon.png" alt="Flubber app icon" width="160">
 </p>
 
+<p align="center">
+  <video src="https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4" width="720" controls muted loop></video>
+</p>
+
+> ▶️ Demo. If the video doesn't play inline, [watch it here](https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4).
+
 # 🟢 Flubber — AI slime pet for macOS
 
 Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit**

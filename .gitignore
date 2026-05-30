@@ -11,3 +11,6 @@ build/
 # Datos locales del usuario viven en ~/Library/Application Support/SlimePet
 
 icon/AppIcon.icns
+
+# fuente del demo (se versiona el .mp4 ya convertido)
+*.mov
