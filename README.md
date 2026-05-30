@@ -123,6 +123,7 @@ facts with tools**, cite sources, and admit when it doesn't know.
 
 - Captures the **whole screen** or **a specific app**.
 - Flubber's window **does not appear** in its own capture, nor in **recordings / screen sharing** (Meet, Zoom, Chrome, QuickTime) — so it stays invisible to anyone watching your shared screen. See the note at the top: this is what makes it useful for **interviews** and other shared-screen calls.
+- This stealth is a **toggle** in the 🟢 menu — **"Hide from captures/recordings 🕵️"** — and it's **enabled by default**. Turn it off if you'd rather have Flubber show up in screenshots and shared screens.
 - The capture is optimized to **JPEG** before sending (lighter).
 - The capture is shown as a **thumbnail** in the chat (click to open); you can attach one manually with 👁️ and remove it with the ✕.
 

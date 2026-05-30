@@ -1732,7 +1732,7 @@ final class PetWindow: NSWindow {
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless], backing: .buffered, defer: false)
         isOpaque = false; backgroundColor = .clear; hasShadow = false
-        sharingType = .none          // no aparecer en grabaciones / compartir pantalla
+        sharingType = .none          // por defecto: no aparecer en grabaciones / compartir pantalla
         acceptsMouseMovedEvents = true
         level = .floating; ignoresMouseEvents = false; isMovableByWindowBackground = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -1743,6 +1743,9 @@ final class PetWindow: NSWindow {
     }
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// `hidden=true` => la ventana no aparece en capturas/grabaciones/compartir pantalla.
+    func applyCapturePrivacy(_ hidden: Bool) { sharingType = hidden ? .none : .readOnly }
 }
 
 // MARK: - App
@@ -1776,6 +1779,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cfg = AIConfig.load()
         Loc.override = cfg.lang                      // idioma guardado (nil = sistema)
         view.client = makeBackend(cfg)
+        window.applyCapturePrivacy(cfg.hideFromCaptureValue)   // oculto por defecto
         if let spec = cfg.customSkin, let skin = Pal.skin(from: spec) { Pal.setAISkin(skin) }
         view.onChatRequested = { [weak self] in self?.openChat() }
 
@@ -1860,6 +1864,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: Loc.t("Crear skin con IA… 🎨✨", "Create AI skin… 🎨✨"), action: #selector(makeSkin), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: Loc.t("Configurar IA… ⚙️", "AI settings… ⚙️"), action: #selector(showConfig), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: Loc.t("Restablecer permisos 🔒", "Reset permissions 🔒"), action: #selector(resetPerms), keyEquivalent: ""))
+        let hideItem = NSMenuItem(title: Loc.t("Ocultar en capturas/grabaciones 🕵️", "Hide from captures/recordings 🕵️"), action: #selector(toggleHideFromCapture), keyEquivalent: "")
+        hideItem.state = (view.client?.config.hideFromCaptureValue ?? true) ? .on : .off
+        menu.addItem(hideItem)
         menu.addItem(NSMenuItem(title: Loc.t("Idioma: English 🌐", "Language: Español 🌐"), action: #selector(toggleLang), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: Loc.t("¡Pasea!", "Walk!"), action: #selector(walkNow), keyEquivalent: "w"))
@@ -1912,6 +1919,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard var c = view.client?.config else { return }
         c.allowBrowser = nil; c.allowCommand = nil; c.allowOpen = nil
         view.client?.config = c; c.save()
+    }
+    @objc func toggleHideFromCapture() {
+        guard var c = view.client?.config else { return }
+        let next = !c.hideFromCaptureValue
+        c.hideFromCapture = next
+        view.client?.config = c; c.save()
+        window.applyCapturePrivacy(next)
+        rebuildMenu()
     }
     @objc func setNameDialog() {
         NSApp.activate(ignoringOtherApps: true)

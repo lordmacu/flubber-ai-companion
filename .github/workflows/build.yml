@@ -3,8 +3,12 @@ name: Build Flubber
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write          # necesario para publicar Releases
 
 jobs:
   build:
@@ -16,17 +20,26 @@ jobs:
       - name: Show toolchain
         run: swiftc --version
 
-      - name: Build (.app, firma ad-hoc en CI)
+      - name: Build Flubber.app (firma ad-hoc en CI)
         run: |
           chmod +x build.sh
           ./build.sh
 
-      - name: Zip app
+      - name: Zip .app
         run: ditto -c -k --keepParent Flubber.app Flubber.app.zip
 
+      # Artefacto descargable en CADA build (pestaña Actions → run → Artifacts)
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Flubber-macos
           path: Flubber.app.zip
           if-no-files-found: error
+
+      # Si es un tag vX.Y.Z, publica un Release con el .app adjunto
+      - name: Publish Release (solo en tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Flubber.app.zip
+          generate_release_notes: true
