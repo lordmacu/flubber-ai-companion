@@ -20,14 +20,18 @@ windows/
 
 ## Status
 
-- [x] Portable core: model, AI providers (MiniMax/Claude/ChatGPT/DeepSeek) with real SSE streaming, agent loop, web tools.
-- [ ] WPF app: transparent click-through pet window + pixel-art render (SkiaSharp).
-- [ ] System tray + menu, animation loop, chat panel, HUD.
-- [ ] Windows-native tools: screen capture (Windows.Graphics.Capture), capture-stealth
-      (`SetWindowDisplayAffinity` / `WDA_EXCLUDEFROMCAPTURE`), browser control (Chrome DevTools Protocol),
-      open/run, toast notifications.
+- [x] Portable core: model, AI providers (MiniMax/Claude/ChatGPT/DeepSeek) with real SSE streaming, agent loop, web tools. **Builds in CI (ubuntu).**
+- [x] WPF app: transparent topmost pet window + pixel-art render (SkiaSharp), system tray + care menu, animation loop, look-at-cursor, drag-to-move, minimal chat. **Builds in CI (windows).**
+- [x] Capture-stealth: `SetWindowDisplayAffinity` / `WDA_EXCLUDEFROMCAPTURE` (on by default, toggle in tray).
+- [x] Platform tools wired via `Agent/IPlatformBridge.cs`: open, run command, reminders, confirmations, control-slime, AI skin.
+- [ ] Real screen capture (`Windows.Graphics.Capture`) — currently stubbed.
+- [ ] Browser control (Chrome DevTools Protocol) — currently stubbed.
+- [ ] Full pixel chat panel + HUD + AI-settings window (parity with macOS).
+- [ ] Extra animations (walk across screen, roll, wall-slide) and toast polish.
+- [ ] Package the `.exe` as a CI artifact / release.
 
-The platform-specific tools are abstracted behind `Agent/IPlatformBridge.cs`, implemented by the WPF app.
+The platform-specific tools are abstracted behind `Agent/IPlatformBridge.cs`, implemented by the WPF app
+(`PetWindow.xaml.cs`). Both projects compile in `.github/workflows/windows-build.yml`.
 
 ## Build
 
