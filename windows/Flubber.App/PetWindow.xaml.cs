@@ -518,8 +518,9 @@ public partial class PetWindow : Window, IPlatformBridge
         var newText = full.Substring(start).Trim();
         if (newText.Length < 40 || !_cfg.IsConfigured) return;
         _meetingSummarizedLen = full.Length;
-        var sys = Loc.T("Resume en 1-2 frases muy breves lo NUEVO de esta reunión. Solo el contenido esencial, sin preámbulos. Español.",
-                        "Summarize in 1-2 very short sentences the NEW part of this meeting. Only essential content, no preamble. English.");
+        var sys = Loc.T(
+            "Anota en UNA sola frase corta y neutral SOLO de qué se está hablando ahora. NO saludes, NO te presentes, NO uses emojis ni opiniones. Solo el tema o dato. Español.",
+            "Note in ONE short neutral sentence ONLY what is being talked about now. NO greetings, NO introducing yourself, NO emojis or opinions. Just the topic or fact. English.");
         var mini = (await _client.ChatAsync(sys, Array.Empty<(string, string)>(), newText, 220).ConfigureAwait(false) ?? "").Trim();
         if (mini.Length == 0) return;
         Log.Write("📝 resumen parcial: " + (mini.Length > 60 ? mini[..60] : mini));
@@ -562,14 +563,18 @@ public partial class PetWindow : Window, IPlatformBridge
         var basis = _meetingRollingSummaries.Count > 0
             ? string.Join("\n", _meetingRollingSummaries.Select(s => "- " + s))
             : transcript;
-        // Prompt distinto según fue reunión formal o solo una charla.
+        // Reunión (≥1min): frase de cierre + resumen estructurado. Charla (<1min):
+        // solo un resumen corto, sin frase de cierre ni estructura.
+        if (isMeeting)
+            _chat?.AppendAssistant(Loc.T("✅ Ya terminé de escuchar. Este fue tu resumen:", "✅ Done listening. Here's your summary:"));
+
         var sys = isMeeting
             ? Loc.T(
-                $"Eres {_stats.DisplayName}, una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos si los hay. Solo español.",
-                $"You are {_stats.DisplayName}, a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points, 3) action items if any. English only.")
+                "Resume lo que se dijo en una reunión, directo y claro. NO saludes ni te presentes ni hables de ti. Estructura: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos si los hay. Solo español.",
+                "Summarize what was said in a meeting, direct and clear. Do NOT greet or introduce yourself. Structure: 1) short summary, 2) key points, 3) action items if any. English only.")
             : Loc.T(
-                $"Eres {_stats.DisplayName}, una mascota que escuchó una breve conversación (NO una reunión formal). Cuenta en PRIMERA PERSONA, tierno y breve, de qué se habló. No uses secciones de tareas salvo que claramente las haya; solo un resumen natural. Solo español.",
-                $"You are {_stats.DisplayName}, a pet that overheard a short conversation (NOT a formal meeting). Tell in FIRST PERSON, cute and brief, what was talked about. Don't use action-item sections unless clearly present; just a natural summary. English only.");
+                "Resume en 1-2 frases lo que se habló, directo. NO saludes ni te presentes ni hables de ti. Solo el resumen. Español.",
+                "Summarize in 1-2 sentences what was talked about, direct. Do NOT greet or introduce yourself. Just the summary. English only.");
         var user = (isMeeting
                 ? Loc.T("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
                         "Here's what I heard in the meeting (may have errors):\n\n")

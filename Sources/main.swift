@@ -1332,8 +1332,9 @@ final class PetView: NSView {
         let new = String(full.dropFirst(start)).trimmingCharacters(in: .whitespacesAndNewlines)
         guard new.count >= 40, let client = client, client.config.isConfigured else { completion?(); return }
         meetingSummarizedLen = full.count
-        let sys = Loc.t("Resume en 1-2 frases muy breves lo NUEVO de esta reunión. Solo el contenido esencial, sin preámbulos. Español.",
-                        "Summarize in 1-2 very short sentences the NEW part of this meeting. Only essential content, no preamble. English.")
+        let sys = Loc.t(
+            "Anota en UNA sola frase corta y neutral SOLO de qué se está hablando ahora. NO saludes, NO te presentes, NO uses emojis ni opiniones. Solo el tema o dato. Español.",
+            "Note in ONE short neutral sentence ONLY what is being talked about now. NO greetings, NO introducing yourself, NO emojis or opinions. Just the topic or fact. English.")
         client.chat(system: sys, history: [], user: new, maxTokens: 220) { [weak self] reply in
             DispatchQueue.main.async {
                 guard let self = self else { completion?(); return }
@@ -1387,15 +1388,19 @@ final class PetView: NSView {
             ? transcript
             : meetingRollingSummaries.map { "- \($0)" }.joined(separator: "\n")
 
+        // Reunión (≥1min): frase de cierre + resumen estructurado. Charla (<1min):
+        // solo un resumen corto, sin frase de cierre ni estructura.
+        if isMeeting {
+            appendToMeetingConversation(Loc.t("✅ Ya terminé de escuchar. Este fue tu resumen:", "✅ Done listening. Here's your summary:"))
+        }
         chatBusy = true; chatStick = true; chatScrollToBottom = true; streamLive = ""; stepLines = []; chatActivity = 0; needsDisplay = true
-        // Prompt distinto según fue una reunión formal o solo una charla.
         let sys = isMeeting
             ? Loc.t(
-                "Eres \(stats.displayName), una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
-                "You are \(stats.displayName), a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
+                "Resume lo que se dijo en una reunión, directo y claro. NO saludes ni te presentes ni hables de ti. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
+                "Summarize what was said in a meeting, direct and clear. Do NOT greet or introduce yourself. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
             : Loc.t(
-                "Eres \(stats.displayName), una mascota que escuchó una breve conversación (NO una reunión formal). Cuenta en PRIMERA PERSONA, tierno y breve, de qué se habló. No uses secciones de tareas/acuerdos salvo que claramente las haya; solo un resumen natural. Solo español.",
-                "You are \(stats.displayName), a pet that overheard a short conversation (NOT a formal meeting). Tell in FIRST PERSON, cute and brief, what was talked about. Don't use action-item sections unless clearly present; just a natural summary. English only.")
+                "Resume en 1-2 frases lo que se habló, directo. NO saludes ni te presentes ni hables de ti. Solo el resumen. Español.",
+                "Summarize in 1-2 sentences what was talked about, direct. Do NOT greet or introduce yourself. Just the summary. English only.")
         let userMsg = isMeeting
             ? Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
                     "Here's what I heard in the meeting (may have errors):\n\n") + basis
