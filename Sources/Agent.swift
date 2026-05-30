@@ -346,9 +346,12 @@ enum ScreenCapture {
 
     static func grab(appHint: String? = nil, excluding window: NSWindow? = nil, completion: @escaping (String?, String?) -> Void) {
         // Verifica el permiso DE VERDAD; si falta, lo pide y abre el panel correcto.
-        if !CGPreflightScreenCaptureAccess() {
+        let pre = CGPreflightScreenCaptureAccess()
+        Log.write("📸 grab(appHint=\(appHint ?? "nil")) — CGPreflightScreenCaptureAccess=\(pre)")
+        if !pre {
             DispatchQueue.main.async {
-                _ = CGRequestScreenCaptureAccess()
+                let granted = CGRequestScreenCaptureAccess()
+                Log.write("🔐 Sin permiso de pantalla → CGRequestScreenCaptureAccess=\(granted). Abriendo panel de Ajustes.")
                 if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     NSWorkspace.shared.open(u)
                 }
@@ -357,6 +360,7 @@ enum ScreenCapture {
             return
         }
         let targetID = appHint.flatMap { windowID(matching: $0) }
+        Log.write("📸 Permiso OK. Capturando \(targetID != nil ? "ventana id=\(targetID!)" : "pantalla completa").")
         DispatchQueue.global().async {
             let path = shotsDir.appendingPathComponent(UUID().uuidString + ".jpg").path
             let p = Process()
@@ -365,7 +369,10 @@ enum ScreenCapture {
             else { p.arguments = ["-x", "-t", "jpg", path] }
             var ok = true
             do { try p.run(); p.waitUntilExit() } catch { ok = false }
+            let exists = FileManager.default.fileExists(atPath: path)
+            let bytes = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? nil
             let b64 = ok ? NSImage(contentsOfFile: path).flatMap { encode($0, maxW: 1000) } : nil
+            Log.write("📸 screencapture ok=\(ok) archivo=\(exists) bytes=\(bytes ?? 0) b64=\(b64 != nil ? "sí(\(b64!.count))" : "no")")
             DispatchQueue.main.async { completion(b64, ok ? path : nil) }
         }
     }

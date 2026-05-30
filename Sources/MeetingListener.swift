@@ -28,6 +28,15 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
     private var task: SFSpeechRecognitionTask?
     private var rotateTimer: Timer?
     private var startedAt = Date()
+    private var audioBuffers = 0          // cuántos buffers de audio han llegado (diagnóstico)
+    private var loggedFirstPartial = false
+
+    // SFSpeechRecognizer necesita el audio en mono/16kHz; ScreenCaptureKit lo
+    // entrega en 48kHz estéreo → convertimos cada buffer con AVAudioConverter.
+    private var converter: AVAudioConverter?
+    private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                             sampleRate: 16_000, channels: 1, interleaved: false)!
+    private var loggedConvErr = false
 
     /// Texto completo (segmentos finales + lo que se está reconociendo ahora).
     var fullText: String {
@@ -39,8 +48,10 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
 
     func start(completion: @escaping (Bool, String?) -> Void) {
         guard !isListening else { completion(true, nil); return }
+        Log.write("🎧 listen.start — pidiendo permiso de Speech…")
         SFSpeechRecognizer.requestAuthorization { status in
             DispatchQueue.main.async {
+                Log.write("🎧 Speech auth status=\(status.rawValue) (3=authorized, 2=denied, 1=restricted, 0=notDetermined)")
                 guard status == .authorized else {
                     completion(false, Loc.t("Falta permiso de reconocimiento de voz (Ajustes → Privacidad).",
                                             "Missing speech-recognition permission (Settings → Privacy)."))
@@ -49,9 +60,11 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
                 let id = Loc.isES ? "es-ES" : "en-US"
                 self.recognizer = SFSpeechRecognizer(locale: Locale(identifier: id)) ?? SFSpeechRecognizer()
                 guard let rec = self.recognizer, rec.isAvailable else {
+                    Log.write("🎧 recognizer NO disponible (rec=\(self.recognizer != nil), available=\(self.recognizer?.isAvailable ?? false))")
                     completion(false, Loc.t("Reconocimiento de voz no disponible.", "Speech recognition unavailable."))
                     return
                 }
+                Log.write("🎧 recognizer OK locale=\(id) onDevice=\(rec.supportsOnDeviceRecognition)")
                 Task { await self.beginCapture(completion: completion) }
             }
         }
@@ -61,7 +74,9 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
     private func beginCapture(completion: @escaping (Bool, String?) -> Void) async {
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+            Log.write("🎧 SCShareableContent — displays=\(content.displays.count)")
             guard let display = content.displays.first else {
+                Log.write("🎧 sin display para capturar audio")
                 completion(false, Loc.t("No encontré la pantalla para capturar audio.", "No display found for audio capture."))
                 return
             }
@@ -81,18 +96,25 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
             try await s.startCapture()
             self.stream = s
 
+            audioBuffers = 0
+            loggedFirstPartial = false
+            loggedConvErr = false
+            converter = nil
             startChunk()
             startedAt = Date()
             isListening = true
             rotateTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { [weak self] _ in self?.rotateChunk() }
+            Log.write("🎧 SCStream capturando audio ✅ (48kHz/2ch, excluye audio propio). Listening=true")
             completion(true, nil)
         } catch {
+            Log.write("🎧 ERROR beginCapture: \(error.localizedDescription)")
             completion(false, Loc.t("No pude iniciar la captura de audio: ", "Couldn't start audio capture: ") + error.localizedDescription)
         }
     }
 
     func stop() {
         guard isListening else { return }
+        Log.write("🎧 listen.stop — buffers de audio=\(audioBuffers), transcript=\(fullText.count) chars")
         isListening = false
         rotateTimer?.invalidate(); rotateTimer = nil
         request?.endAudio()
@@ -113,15 +135,22 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
             guard let self = self else { return }
             if let result = result {
                 self.partial = result.bestTranscription.formattedString
+                if !self.loggedFirstPartial, !self.partial.isEmpty {
+                    self.loggedFirstPartial = true
+                    Log.write("🎧 primer parcial reconocido: \"\(self.partial.prefix(60))\"")
+                }
                 if result.isFinal {
                     let seg = self.partial.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !seg.isEmpty { self.transcript += seg + " " }
+                    if !seg.isEmpty { self.transcript += seg + " "; Log.write("🎧 segmento: \"\(seg.prefix(60))\"") }
                     self.partial = ""
                 }
             }
-            if error != nil, self.isListening {
-                // la petición terminó/expiró: arranca otra para seguir escuchando
-                self.startChunk()
+            if let error = error {
+                Log.write("🎧 recognitionTask error: \(error.localizedDescription)")
+                if self.isListening {
+                    // la petición terminó/expiró: arranca otra para seguir escuchando
+                    self.startChunk()
+                }
             }
         }
     }
@@ -138,9 +167,40 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .audio, isListening, sampleBuffer.isValid else { return }
-        if let pcm = MeetingListener.pcmBuffer(from: sampleBuffer) {
-            request?.append(pcm)
+        guard let pcm = MeetingListener.pcmBuffer(from: sampleBuffer) else { return }
+        audioBuffers += 1
+        if audioBuffers == 1 {
+            Log.write("🎧 primer buffer de audio ✅ formato origen: \(Int(pcm.format.sampleRate))Hz ch=\(pcm.format.channelCount) interleaved=\(pcm.format.isInterleaved)")
         }
+        // Convierte a mono/16kHz antes de dárselo al reconocedor.
+        guard let mono = convertToTarget(pcm) else { return }
+        request?.append(mono)
+        if audioBuffers % 250 == 0 { Log.write("🎧 audio buffers=\(audioBuffers), transcript=\(transcript.count) chars") }
+    }
+
+    /// Convierte un buffer (48kHz estéreo) al formato del reconocedor (16kHz mono).
+    private func convertToTarget(_ input: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        if converter == nil || converter?.inputFormat != input.format {
+            converter = AVAudioConverter(from: input.format, to: targetFormat)
+        }
+        guard let conv = converter else { return nil }
+        let ratio = targetFormat.sampleRate / input.format.sampleRate
+        let cap = AVAudioFrameCount(Double(input.frameLength) * ratio) + 1024
+        guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: cap) else { return nil }
+        var fed = false
+        var err: NSError?
+        conv.convert(to: out, error: &err) { _, status in
+            if fed { status.pointee = .noDataNow; return nil }
+            fed = true; status.pointee = .haveData; return input
+        }
+        if let err = err, !loggedConvErr {
+            loggedConvErr = true
+            Log.write("🎧 AVAudioConverter error: \(err.localizedDescription)")
+        }
+        if audioBuffers == 1 {
+            Log.write("🎧 buffer convertido: frames=\(out.frameLength) → \(Int(targetFormat.sampleRate))Hz mono")
+        }
+        return out.frameLength > 0 ? out : nil
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {

@@ -8,6 +8,7 @@ struct Msg: Codable {
     var role: String           // "user" | "assistant"
     var content: String
     var imagePath: String? = nil   // captura adjunta (thumbnail clicable)
+    var filePath: String? = nil    // archivo adjunto clicable (p.ej. transcripción .txt)
 }
 
 struct Conversation: Codable {
@@ -22,6 +23,7 @@ struct Conversation: Codable {
 
 struct ConversationStore: Codable {
     var conversations: [Conversation] = []
+    var activeId: String? = nil          // id de la última conversación abierta (para restaurarla al arrancar)
 
     static var fileURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

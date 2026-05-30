@@ -174,6 +174,12 @@ final class PetView: NSView {
     var chatButtons: [HudButton] = []   // botones del panel (close/new/list)
     var listRowRects: [NSRect] = []     // filas de la lista de conversaciones
     var chatStick = true                // pegado al fondo (autoscroll)
+    var chatScrollToBottom = false      // al abrir/cambiar de conversación: salta al final absoluto
+    // --- escucha de reunión: resúmenes rodantes por lotes ---
+    var meetingConvId: String? = nil           // conversación dedicada a la reunión actual
+    var meetingSummarizedLen = 0               // cuánto transcript ya se resumió
+    var meetingRollingSummaries: [String] = [] // mini-resúmenes acumulados
+    var meetingRollTimer: Timer?               // dispara un mini-resumen cada X tiempo
     var chatContentH: CGFloat = 0       // alto del contenido (para clamping del scroll)
     var chatAreaH: CGFloat = 0
     var chatMouse: NSPoint = .zero       // posición del mouse dentro del chat (para hover)
@@ -181,6 +187,7 @@ final class PetView: NSView {
     var pendingShot: String? = nil       // captura de pantalla lista para adjuntar
     var pendingShotPath: String? = nil   // ruta del PNG de esa captura
     var thumbRects: [(rect: NSRect, path: String)] = []
+    var fileButtons: [(rect: NSRect, path: String)] = []   // links clicables a archivos (transcripción)
     var imgCache: [String: NSImage] = [:]
     var attrCache: [String: NSAttributedString] = [:]   // markdown renderizado (cache)
     var sendRect: NSRect = .zero                         // botón de enviar (flechita)
@@ -356,8 +363,8 @@ final class PetView: NSView {
             } else {
                 lookAtMouse(win)
             }
-            // si el mouse está encima o el chat está abierto, se queda quieto
-            if stateTimer > 60 && !hovering && !chatOpen {
+            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento
+            if stateTimer > 60 && !hovering && !chatOpen && !listening {
                 let r = Int.random(in: 0..<100)
                 if r < 3 && stats.energy > 0.3 { startWalking(in: screen) }
                 else if r == 4 && stats.mood > 0.6 { enter(.dancing) }
@@ -694,6 +701,39 @@ final class PetView: NSView {
         if state == .eating && stateTimer < 48 {
             let fy = footY + Int(height * 0.30)
             drawPattern(ctx, foodSprite(eatingFood), Int(cx) + 5, fy, eatingFood == .candy ? Pal.heart : Pal.crumb)
+        }
+
+        // escuchando la reunión: orejitas que se mueven + ondas de sonido
+        if listening { drawListening(ctx, cx: Int(cx), height: height, footY: footY) }
+    }
+
+    /// Decoración de "escuchando": dos orejitas que se inclinan (twitch) y ondas
+    /// de sonido que pulsan al lado de la cabeza.
+    func drawListening(_ ctx: CGContext, cx: Int, height: CGFloat, footY: Int) {
+        let skin = stats.isSick ? Pal.sick : Pal.skin
+        let topY = footY + Int(height) - 1
+        // twitch: la punta de las orejas se mueve un pelín con el tiempo
+        let tw = (tick / 9) % 2 == 0 ? 0 : 1
+
+        // oreja de 2x4: cuerpo + interior rosita + borde oscuro, se inclina a la punta
+        func ear(_ x0: Int, _ lean: Int) {
+            for oy in 0..<4 {
+                let lx = x0 + (oy >= 2 ? lean : 0)
+                fill(ctx, lx,     topY + oy, skin.bodyDark)            // borde exterior
+                fill(ctx, lx + 1, topY + oy, oy >= 1 && oy <= 2 ? Pal.heart : skin.body)
+            }
+        }
+        ear(cx - 6, -tw)     // oreja izquierda (se inclina a la izquierda)
+        ear(cx + 4,  tw)     // oreja derecha
+
+        // ondas de sonido pulsantes a la derecha de la cabeza ")))"
+        let wx = cx + 9
+        let wy = footY + Int(height * 0.52)
+        let arc = ["1", "01", "1"]                       // un arco ")" simple
+        let phase = (tick / 7) % 3                        // cuántas ondas se ven (1..3)
+        for i in 0...phase {
+            let a = 0.9 - Double(i) * 0.22
+            drawPattern(ctx, arc, wx + i * 2, wy - 1, Pal.note.withAlphaComponent(max(0.25, a)))
         }
     }
 
@@ -1089,7 +1129,8 @@ final class PetView: NSView {
         if chatActive {
             if chatStore.conversations.isEmpty { chatStore.conversations.append(.new()); chatStore.save() }
             convIndex = min(convIndex, chatStore.conversations.count - 1)
-            ensureAgent(); listOpen = false; chatStick = true
+            ensureAgent(); listOpen = false; chatStick = true; chatScrollToBottom = true
+            persistActiveConversation()
             // si venía moviéndose, quédate quieto para que el diálogo no se mueva
             if [.dancing, .walking, .rolling, .chasing, .happy, .reacting, .falling].contains(state) { state = .idle; stateTimer = 0 }
             resizeForChat(true)
@@ -1127,13 +1168,32 @@ final class PetView: NSView {
         chatStore.conversations.append(.new())
         convIndex = chatStore.conversations.count - 1
         chatStore.save(); ensureAgent(); listOpen = false; chatStick = true; chatScroll = 0
+        persistActiveConversation()
         needsDisplay = true
     }
 
     func selectConversation(_ i: Int) {
         guard i >= 0, i < chatStore.conversations.count else { return }
-        convIndex = i; ensureAgent(); listOpen = false; chatStick = true
+        convIndex = i; ensureAgent(); listOpen = false; chatStick = true; chatScrollToBottom = true
+        persistActiveConversation()
         needsDisplay = true
+    }
+
+    /// Al arrancar: abre la conversación que estaba activa la última vez.
+    func restoreActiveConversation() {
+        if let id = chatStore.activeId,
+           let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) {
+            convIndex = idx
+        } else {
+            convIndex = max(0, chatStore.conversations.count - 1)   // a falta de dato, la más reciente
+        }
+    }
+
+    /// Recuerda cuál es la conversación activa (para restaurarla al reabrir la app).
+    func persistActiveConversation() {
+        guard convIndex >= 0, convIndex < chatStore.conversations.count else { return }
+        chatStore.activeId = chatStore.conversations[convIndex].id
+        chatStore.save()
     }
 
     func captureScreen() {
@@ -1214,6 +1274,146 @@ final class PetView: NSView {
         }, completion: { reply in finish(reply) })
     }
 
+    // ==================================================================
+    // Escucha de reunión: conversación dedicada + resúmenes rodantes por
+    // lotes + síntesis final + transcripción guardada con link clicable.
+    // ==================================================================
+
+    /// Al empezar a escuchar: crea una conversación dedicada y arranca el timer
+    /// de resúmenes parciales (cada ~4 min resume el trozo nuevo).
+    func beginMeetingConversation() {
+        guard #available(macOS 13.0, *) else { return }
+        let df = DateFormatter(); df.dateFormat = "HH:mm"
+        let title = Loc.t("🎧 Reunión \(df.string(from: Date()))", "🎧 Meeting \(df.string(from: Date()))")
+        let conv = Conversation(id: UUID().uuidString, title: title, messages: [])
+        chatStore.conversations.append(conv)
+        meetingConvId = conv.id
+        convIndex = chatStore.conversations.count - 1
+        meetingSummarizedLen = 0
+        meetingRollingSummaries = []
+        chatStore.save(); persistActiveConversation(); ensureAgent()
+
+        meetingRollTimer?.invalidate()
+        meetingRollTimer = Timer.scheduledTimer(withTimeInterval: 240, repeats: true) { [weak self] _ in
+            self?.rollMeetingSummary()
+        }
+        Log.write("📝 reunión iniciada — conversación dedicada creada")
+    }
+
+    /// Añade un mensaje del slime a la conversación de la reunión (por id).
+    func appendToMeetingConversation(_ text: String, filePath: String? = nil) {
+        guard let id = meetingConvId,
+              let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) else { return }
+        chatStore.conversations[idx].messages.append(Msg(role: "assistant", content: text, filePath: filePath))
+        chatStore.save()
+        if chatActive && convIndex == idx { chatStick = true; chatScrollToBottom = true }
+        needsDisplay = true
+    }
+
+    /// Mini-resumen del trozo NUEVO de transcript desde la última vez.
+    func rollMeetingSummary(completion: (() -> Void)? = nil) {
+        guard #available(macOS 13.0, *) else { completion?(); return }
+        let full = MeetingListener.shared.transcript
+        let start = min(meetingSummarizedLen, full.count)
+        let new = String(full.dropFirst(start)).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard new.count >= 40, let client = client, client.config.isConfigured else { completion?(); return }
+        meetingSummarizedLen = full.count
+        let sys = Loc.t("Resume en 1-2 frases muy breves lo NUEVO de esta reunión. Solo el contenido esencial, sin preámbulos. Español.",
+                        "Summarize in 1-2 very short sentences the NEW part of this meeting. Only essential content, no preamble. English.")
+        client.chat(system: sys, history: [], user: new, maxTokens: 220) { [weak self] reply in
+            DispatchQueue.main.async {
+                guard let self = self else { completion?(); return }
+                let mini = (reply.map { Agent.cleanFinal($0) } ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !mini.isEmpty {
+                    self.meetingRollingSummaries.append(mini)
+                    Log.write("📝 resumen parcial #\(self.meetingRollingSummaries.count): \(mini.prefix(60))")
+                    self.appendToMeetingConversation("🎧 " + mini)        // partial en vivo (en su conversación)
+                    self.say(Loc.t("🎧 anoté algo de la reunión…", "🎧 jotted down something…"))
+                }
+                completion?()
+            }
+        }
+    }
+
+    /// Al hacer stop: cierra el último trozo, sintetiza el resumen final en el
+    /// chat (streaming) y adjunta la transcripción completa como link clicable.
+    func finishMeeting() {
+        guard #available(macOS 13.0, *) else { return }
+        meetingRollTimer?.invalidate(); meetingRollTimer = nil
+        rollMeetingSummary { [weak self] in self?.finalizeMeetingSummary() }
+    }
+
+    private func finalizeMeetingSummary() {
+        let transcript = MeetingListener.shared.fullText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filePath = saveTranscriptFile(transcript)
+        Log.write("📝 finalize — transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count), file=\(filePath != nil)")
+
+        // Lleva el chat a la conversación de la reunión y ábrelo.
+        if let id = meetingConvId, let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) {
+            convIndex = idx; ensureAgent(); persistActiveConversation()
+        }
+        if !chatActive { toggleChat() }
+        chatScrollToBottom = true
+
+        guard !transcript.isEmpty else {
+            appendToMeetingConversation(Loc.t("No escuché nada claro 👂", "Didn't catch anything clear 👂")); return
+        }
+        // Sin IA configurada: fallback → muestra lo que escuchó SIN procesar.
+        guard let client = client, client.config.isConfigured else {
+            Log.write("📝 sin IA → fallback: muestro la transcripción en crudo")
+            appendToMeetingConversation(
+                Loc.t("🎧 Esto fue lo que escuché (sin IA para resumir):\n\n", "🎧 Here's what I heard (no AI to summarize):\n\n") + transcript)
+            if let fp = filePath { appendToMeetingConversation(Loc.t("📄 Ver transcripción completa", "📄 View full transcript"), filePath: fp) }
+            return
+        }
+
+        // Base de la síntesis: si hubo resúmenes rodantes, úsalos (corto); si no, el transcript.
+        let basis = meetingRollingSummaries.isEmpty
+            ? transcript
+            : meetingRollingSummaries.map { "- \($0)" }.joined(separator: "\n")
+
+        chatBusy = true; chatStick = true; chatScrollToBottom = true; streamLive = ""; stepLines = []; chatActivity = 0; needsDisplay = true
+        let sys = Loc.t(
+            "Eres \(stats.displayName), una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave (viñetas), 3) tareas/acuerdos si los hay. Solo español.",
+            "You are \(stats.displayName), a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points (bullets), 3) action items if any. English only.")
+        let userMsg = Loc.t("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
+                            "Here's what I heard in the meeting (may have errors):\n\n") + basis
+        let msgs = [AIMessage(role: "system", content: sys), AIMessage(role: "user", content: userMsg)]
+
+        client.completeStream(messages: msgs, tools: nil, maxTokens: 1200, onDelta: { [weak self] chunk in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.streamLive = (self.streamLive ?? "") + chunk
+                self.stepLines = []; self.chatStick = true; self.needsDisplay = true
+            }
+        }, completion: { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let reply = (result?.content ?? self.streamLive ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let final = reply.isEmpty ? Loc.t("No pude resumir lo que escuché 😅", "Couldn't summarize what I heard 😅") : reply
+                self.streamLive = nil; self.chatBusy = false; self.chatActivity = 0
+                self.appendToMeetingConversation(final)
+                if let fp = filePath {
+                    self.appendToMeetingConversation(Loc.t("📄 Ver transcripción completa", "📄 View full transcript"), filePath: fp)
+                }
+            }
+        })
+    }
+
+    /// Guarda la transcripción completa a un .txt y devuelve su ruta.
+    private func saveTranscriptFile(_ text: String) -> String? {
+        guard !text.isEmpty else { return nil }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("SlimePet/transcripts", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd_HH-mm"
+        let url = dir.appendingPathComponent("reunion-\(df.string(from: Date())).txt")
+        let stamp = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
+        let header = Loc.t("Transcripción de reunión — ", "Meeting transcript — ") + stamp + "\n\n"
+        do { try (header + text).write(to: url, atomically: true, encoding: .utf8); return url.path }
+        catch { Log.write("📝 no pude guardar la transcripción: \(error.localizedDescription)"); return nil }
+    }
+
     func confirmAction(_ title: String, _ detail: String, _ cb: @escaping (Bool, Bool) -> Void) {
         NSApp.activate(ignoringOtherApps: true)
         let a = NSAlert()
@@ -1270,12 +1470,12 @@ final class PetView: NSView {
     }
 
     // ---- dibujo del panel de chat ----
-    struct ChatItem { let text: String; let kind: Int; var imagePath: String? = nil }   // 0 slime, 1 user, 2 paso
+    struct ChatItem { let text: String; let kind: Int; var imagePath: String? = nil; var filePath: String? = nil }   // 0 slime, 1 user, 2 paso
 
     func chatItems() -> [ChatItem] {
         var items: [ChatItem] = []
         for m in chatStore.conversations[convIndex].messages {
-            items.append(ChatItem(text: m.content, kind: m.role == "user" ? 1 : 0, imagePath: m.imagePath))
+            items.append(ChatItem(text: m.content, kind: m.role == "user" ? 1 : 0, imagePath: m.imagePath, filePath: m.filePath))
         }
         for s in stepLines { items.append(ChatItem(text: s, kind: 2)) }
         let live = streamLive ?? ""
@@ -1289,7 +1489,7 @@ final class PetView: NSView {
     }
 
     func drawChat(_ ctx: CGContext) {
-        chatButtons.removeAll(); listRowRects.removeAll(); copyButtons.removeAll(); thumbRects.removeAll()
+        chatButtons.removeAll(); listRowRects.removeAll(); copyButtons.removeAll(); thumbRects.removeAll(); fileButtons.removeAll()
         let W = bounds.width, H = bounds.height
         let pad: CGFloat = 8
         let panel = NSRect(x: pad, y: 96, width: W - 2 * pad, height: H - 96 - pad)
@@ -1340,7 +1540,11 @@ final class PetView: NSView {
         let total = heights.reduce(0, +) + spacing * CGFloat(max(0, items.count - 1)) + 8
         chatContentH = total
         let maxScroll = max(0, total - area.height)
-        if chatStick {
+        if chatScrollToBottom {
+            // al abrir/cambiar de conversación: ver el FINAL (último mensaje completo)
+            chatScroll = maxScroll
+            chatScrollToBottom = false
+        } else if chatStick {
             // mostrar el INICIO del último mensaje (no el final), para no cortar arriba
             let lastTop = heights.dropLast().reduce(0, +) + spacing * CGFloat(max(0, items.count - 1))
             chatScroll = min(lastTop, maxScroll)
@@ -1407,6 +1611,12 @@ final class PetView: NSView {
         let imgH: CGFloat = hasImg ? 66 : 0
         let textRect = NSRect(x: rect.minX + 6, y: rect.minY + 6 + imgH, width: rect.width - 12, height: rect.height - 12 - imgH)
         drawAttr(chatAttr(it), in: textRect)
+        // mensaje con archivo adjunto (transcripción): toda la burbuja es clicable
+        if let path = it.filePath {
+            NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 0.9).setStroke()
+            let bp = NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5); bp.lineWidth = 1; bp.stroke()
+            fileButtons.append((rect, path))
+        }
         // thumbnail de la captura (clicable)
         if let path = it.imagePath {
             let thumb = NSRect(x: rect.minX + 6, y: rect.minY + 5, width: rect.width - 12, height: imgH - 4)
@@ -1541,6 +1751,10 @@ final class PetView: NSView {
         if sendRect.contains(p) { sendChatMessage(); return true }   // botón enviar
         for t in thumbRects where t.rect.contains(p) {          // abrir la captura
             NSWorkspace.shared.open(URL(fileURLWithPath: t.path))
+            return true
+        }
+        for f in fileButtons where f.rect.contains(p) {         // abrir la transcripción completa
+            NSWorkspace.shared.open(URL(fileURLWithPath: f.path))
             return true
         }
         for cb in copyButtons where cb.rect.contains(p) {       // copiar texto de una burbuja
@@ -1826,6 +2040,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var alerted: [String: Date] = [:]
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        // Log de arranque: ruta del binario + estado del permiso de pantalla (TCC).
+        // Si CGPreflight cambia de true→false entre lanzamientos, la firma no es estable.
+        Log.write("🚀 Flubber arrancó — bin=\(Bundle.main.executablePath ?? "?") · permiso pantalla(preflight)=\(CGPreflightScreenCaptureAccess())")
+
         // Evita que macOS "duerma" la app en segundo plano (necesitamos seguir animando).
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                          reason: "SlimePet animation loop")
@@ -1837,6 +2055,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.stats = PetStats.load()
         Pal.index = min(max(0, view.stats.skinIndex), Pal.skins.count - 1)
         view.state = view.stats.isDead ? .dead : (view.stats.stage == .egg ? .egg : .idle)
+        view.restoreActiveConversation()             // abre la última conversación que usabas
 
         // IA
         let cfg = AIConfig.load()
@@ -2034,16 +2253,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             notify("Flubber", Loc.t("La escucha requiere macOS 13+.", "Listening requires macOS 13+.")); return
         }
         let l = MeetingListener.shared
+        Log.write("🎧 toggleListen — isListening=\(l.isListening)")
         if l.isListening {
             l.stop()
             view.listening = false
-            view.say(Loc.t("Dejé de escuchar 👂", "Stopped listening 👂"))
+            view.say(Loc.t("Listo, déjame contarte lo que escuché… 📝", "Done, let me tell you what I heard… 📝"))
             rebuildMenu()
+            // Espera a que el último segmento de voz se vuelque y cierra/resume.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                Log.write("📝 stop → finalizando reunión (síntesis + transcripción)")
+                self?.view.finishMeeting()
+            }
         } else {
             l.start { [weak self] ok, err in
                 DispatchQueue.main.async {
+                    Log.write("🎧 toggleListen.start callback ok=\(ok) err=\(err ?? "-")")
                     if ok {
                         self?.view.listening = true
+                        self?.view.beginMeetingConversation()      // conversación dedicada + resúmenes rodantes
                         self?.view.say(Loc.t("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"))
                     } else {
                         self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))

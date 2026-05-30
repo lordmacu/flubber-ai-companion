@@ -38,16 +38,25 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Firma: ad-hoc por defecto (así `open` funciona desde Terminal sin notarizar).
-# Si exportas FLUBBER_SIGN_ID con una identidad VÁLIDA (no revocada) la usa; si
-# no, cae a ad-hoc. (Un certificado de desarrollo revocado da error 163 al abrir
-# por Gatekeeper, así que NO se usa ninguno por defecto.)
-if [ -n "$FLUBBER_SIGN_ID" ] && security find-identity -v -p codesigning 2>/dev/null | grep -q "$FLUBBER_SIGN_ID"; then
-  echo "🔏 Firmando con $FLUBBER_SIGN_ID"
-  codesign --force --deep --sign "$FLUBBER_SIGN_ID" "$APP" 2>/dev/null \
+# Firma. Prioridad:
+#   1) FLUBBER_SIGN_ID (si lo exportas con una identidad válida).
+#   2) Certificado self-signed local "Flubber Self-Signed" (creado con
+#      setup-signing-cert.sh). Su huella es ESTABLE entre rebuilds, así que el
+#      permiso de Grabación de pantalla (TCC, anclado al cert) PERSISTE. Pide un
+#      único "Abrir de todos modos" la primera vez (no está notarizada).
+#   3) Ad-hoc (CI / si no hay cert). Funciona, pero el permiso se reinicia en
+#      cada rebuild porque la huella del binario cambia.
+# (Un certificado de desarrollo REVOCADO da error 163 al abrir: no usar.)
+SIGN_ID="$FLUBBER_SIGN_ID"
+[ -z "$SIGN_ID" ] && SIGN_ID=$(security find-identity -p codesigning 2>/dev/null \
+  | grep "Flubber Self-Signed" | grep -oE '[0-9A-F]{40}' | head -1)
+
+if [ -n "$SIGN_ID" ] && security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  echo "🔏 Firmando con identidad estable ($SIGN_ID) — el permiso de pantalla persiste."
+  codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
     || codesign --force --deep --sign - "$APP" 2>/dev/null || true
 else
-  echo "🔏 Firma ad-hoc."
+  echo "🔏 Firma ad-hoc (el permiso de pantalla se reinicia en cada rebuild)."
   codesign --force --deep --sign - "$APP" 2>/dev/null || true
 fi
 
