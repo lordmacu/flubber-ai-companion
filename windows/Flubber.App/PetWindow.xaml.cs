@@ -361,11 +361,9 @@ public partial class PetWindow : Window, IPlatformBridge
         }
     }
 
-    public Task<string> BrowserGetUrlAsync()
-        => Task.FromResult(Loc.T("Control del navegador: próximamente en Windows.", "Browser control: coming soon on Windows."));
+    public Task<string> BrowserGetUrlAsync() => Flubber.App.Platform.BrowserCdp.GetUrlAsync();
 
-    public Task<string> BrowserRunJsAsync(string js)
-        => Task.FromResult(Loc.T("Control del navegador: próximamente en Windows.", "Browser control: coming soon on Windows."));
+    public Task<string> BrowserRunJsAsync(string js) => Flubber.App.Platform.BrowserCdp.RunJsAsync(js);
 
     public Task<string> OpenTargetAsync(string target)
     {
