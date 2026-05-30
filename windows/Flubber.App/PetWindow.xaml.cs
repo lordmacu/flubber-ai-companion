@@ -7,7 +7,9 @@ using SkiaSharp.Views.Desktop;
 using Flubber.Core;
 using Flubber.Core.AI;
 using Flubber.Core.Agent;
+using Flubber.Core.Util;
 using Flubber.App.Interop;
+using Flubber.App.Platform;
 using Flubber.App.Rendering;
 using Controls = System.Windows.Controls;
 using Forms = System.Windows.Forms;
@@ -53,6 +55,12 @@ public partial class PetWindow : Window, IPlatformBridge
     private int _wallSide;           // -1 izquierda, +1 derecha, 0 ninguno
     private int _nextWander = 240;
     private long _lastDownTick;      // para detectar doble clic de forma fiable
+
+    // escucha de reunión
+    private bool _listening;
+    private DispatcherTimer? _meetingRollTimer;
+    private int _meetingSummarizedLen;
+    private readonly List<string> _meetingRollingSummaries = new();
 
     public PetWindow()
     {
@@ -207,8 +215,8 @@ public partial class PetWindow : Window, IPlatformBridge
             return;
         }
 
-        // 4) deambular cada cierto tiempo (solo en reposo)
-        if (_transient == null && _tick >= _nextWander && rightBound > leftBound)
+        // 4) deambular cada cierto tiempo (solo en reposo; quieta si escucha)
+        if (_transient == null && !_listening && _tick >= _nextWander && rightBound > leftBound)
         {
             _nextWander = _tick + _rng.Next(300, 700);
             _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound);
@@ -246,6 +254,7 @@ public partial class PetWindow : Window, IPlatformBridge
 
         if (_view.State == SlimeState.StuckWall) { _view.ScaleY = 1.30; _view.ScaleX = 0.85; }   // estirado contra la pared
 
+        _view.Listening = _listening;
         ComputeLook();
         _view.Facing = _facing;
     }
@@ -354,6 +363,9 @@ public partial class PetWindow : Window, IPlatformBridge
         m.Items.Add(Loc.T("Dormir / Despertar 💤", "Sleep / Wake 💤"), null, (_, _) => _stats.ToggleSleep());
         m.Items.Add(new Forms.ToolStripSeparator());
         m.Items.Add(Loc.T("Hablar con Flubber… 💬", "Chat with Flubber… 💬"), null, (_, _) => OpenChat());
+        m.Items.Add(MeetingListener.Shared.IsListening
+            ? Loc.T("Dejar de escuchar la reunión ⏹️", "Stop listening to meeting ⏹️")
+            : Loc.T("Escuchar reunión 👂", "Listen to meeting 👂"), null, (_, _) => ToggleListen());
         m.Items.Add(Loc.T("Configurar IA… ⚙️", "AI settings… ⚙️"), null, (_, _) => OpenSettings());
         m.Items.Add(Loc.T("¡Pasea! 🚶", "Walk! 🚶"), null, (_, _) => StartWalk());
         m.Items.Add(Loc.T("Cambiar color 🎨", "Change color 🎨"), null, (_, _) => CycleColor());
@@ -406,6 +418,7 @@ public partial class PetWindow : Window, IPlatformBridge
 
     private void Quit()
     {
+        try { MeetingListener.Shared.Stop(); } catch { }
         try { _stats.Save(); _tray.Visible = false; _tray.Dispose(); } catch { }
         System.Windows.Application.Current.Shutdown();
     }
@@ -428,6 +441,141 @@ public partial class PetWindow : Window, IPlatformBridge
             _chat.Show();
         }
         _chat.Activate();
+    }
+
+    /// <summary>Abre el chat aunque no haya IA (para mostrar la transcripción de la reunión).</summary>
+    private void EnsureChatOpen()
+    {
+        if (_chat == null)
+        {
+            _chat = new ChatWindow(_agent);
+            _chat.Closed += (_, _) => _chat = null;
+            _chat.Show();
+        }
+        _chat.Activate();
+    }
+
+    // ================================================================ escucha de reunión
+    private void ToggleListen()
+    {
+        if (MeetingListener.Shared.IsListening) StopMeeting();
+        else StartMeeting();
+    }
+
+    private void StartMeeting()
+    {
+        if (!MeetingListener.Shared.Start(out var err))
+        {
+            Notify("Flubber", err ?? Loc.T("No pude escuchar.", "Couldn't listen."));
+            return;
+        }
+        _listening = true;
+        _meetingSummarizedLen = 0;
+        _meetingRollingSummaries.Clear();
+        _meetingRollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(240) };
+        _meetingRollTimer.Tick += (_, _) => _ = RollMeetingSummaryAsync();
+        _meetingRollTimer.Start();
+        Notify("Flubber", Loc.T("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"));
+        _tray.ContextMenuStrip = BuildMenu();
+    }
+
+    private void StopMeeting()
+    {
+        MeetingListener.Shared.Stop();
+        _listening = false;
+        _meetingRollTimer?.Stop(); _meetingRollTimer = null;
+        _tray.ContextMenuStrip = BuildMenu();
+        Notify("Flubber", Loc.T("Listo, déjame resumir lo que escuché… 📝", "Done, let me summarize what I heard… 📝"));
+        // espera a que el último segmento se vuelque y finaliza
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+        t.Tick += async (_, _) => { t.Stop(); await FinishMeetingAsync(); };
+        t.Start();
+    }
+
+    /// <summary>Mini-resumen del trozo NUEVO de transcript (resumen rodante por lotes).</summary>
+    private async Task RollMeetingSummaryAsync()
+    {
+        var full = MeetingListener.Shared.Transcript;
+        var start = Math.Min(_meetingSummarizedLen, full.Length);
+        var newText = full.Substring(start).Trim();
+        if (newText.Length < 40 || !_cfg.IsConfigured) return;
+        _meetingSummarizedLen = full.Length;
+        var sys = Loc.T("Resume en 1-2 frases muy breves lo NUEVO de esta reunión. Solo el contenido esencial, sin preámbulos. Español.",
+                        "Summarize in 1-2 very short sentences the NEW part of this meeting. Only essential content, no preamble. English.");
+        var mini = (await _client.ChatAsync(sys, Array.Empty<(string, string)>(), newText, 220).ConfigureAwait(false) ?? "").Trim();
+        if (mini.Length == 0) return;
+        Log.Write("📝 resumen parcial: " + (mini.Length > 60 ? mini[..60] : mini));
+        Dispatcher.Invoke(() =>
+        {
+            _meetingRollingSummaries.Add(mini);
+            EnsureChatOpen();
+            _chat?.AppendAssistant("🎧 " + mini);
+            Notify("Flubber", Loc.T("🎧 anoté algo de la reunión…", "🎧 jotted down something…"));
+        });
+    }
+
+    /// <summary>Al parar: síntesis final en el chat (streaming) + link a la transcripción.
+    /// Se invoca desde un DispatcherTimer → corre en el hilo UI.</summary>
+    private async Task FinishMeetingAsync()
+    {
+        await RollMeetingSummaryAsync();   // cierra el último trozo pendiente
+
+        var transcript = MeetingListener.Shared.FullText.Trim();
+        var filePath = SaveTranscriptFile(transcript);
+        Log.Write($"📝 finalize — transcript={transcript.Length} chars, partials={_meetingRollingSummaries.Count}, file={(filePath != null)}");
+
+        EnsureChatOpen();
+        if (transcript.Length == 0)
+        {
+            _chat?.AppendAssistant(Loc.T("No escuché nada claro 👂", "Didn't catch anything clear 👂"));
+            return;
+        }
+        // Sin IA: muestra la transcripción en crudo.
+        if (!_cfg.IsConfigured)
+        {
+            _chat?.AppendAssistant(Loc.T("🎧 Esto fue lo que escuché (sin IA para resumir):\n\n",
+                                         "🎧 Here's what I heard (no AI to summarize):\n\n") + transcript);
+            if (filePath != null) _chat?.AppendFileLink(Loc.T("📄 Ver transcripción completa", "📄 View full transcript"), filePath);
+            return;
+        }
+
+        var basis = _meetingRollingSummaries.Count > 0
+            ? string.Join("\n", _meetingRollingSummaries.Select(s => "- " + s))
+            : transcript;
+        var sys = Loc.T(
+            $"Eres {_stats.DisplayName}, una mascota que escuchó una reunión. Cuenta en PRIMERA PERSONA, tierno pero claro, lo que escuchaste. Estructura: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos si los hay. Solo español.",
+            $"You are {_stats.DisplayName}, a pet that listened to a meeting. Tell in FIRST PERSON, cute but clear, what you heard. Structure: 1) short summary, 2) key points, 3) action items if any. English only.");
+        var user = Loc.T("Esto es lo que escuché en la reunión (puede tener errores):\n\n",
+                         "Here's what I heard in the meeting (may have errors):\n\n") + basis;
+        var msgs = new List<AIMessage> { new("system", sys), new("user", user) };
+
+        var bubble = _chat?.BeginStreamingAssistant();
+        var streamed = "";
+        var result = await _client.CompleteStreamAsync(msgs, null, 1200, delta =>
+        {
+            streamed += delta;
+            Dispatcher.Invoke(() => { if (bubble != null) _chat?.UpdateStreaming(bubble, streamed); });
+        });
+
+        var final = (result?.Content ?? streamed).Trim();
+        if (final.Length == 0) final = Loc.T("No pude resumir lo que escuché 😅", "Couldn't summarize what I heard 😅");
+        if (bubble != null) _chat?.CommitStreaming(bubble, final);
+        else _chat?.AppendAssistant(final);
+        if (filePath != null) _chat?.AppendFileLink(Loc.T("📄 Ver transcripción completa", "📄 View full transcript"), filePath);
+    }
+
+    private static string? SaveTranscriptFile(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        try
+        {
+            var dir = Flubber.Core.Platform.Paths.SubDir("transcripts");
+            var path = System.IO.Path.Combine(dir, $"reunion-{DateTime.Now:yyyy-MM-dd_HH-mm}.txt");
+            var header = Loc.T("Transcripción de reunión — ", "Meeting transcript — ") + DateTime.Now.ToString("g") + "\n\n";
+            System.IO.File.WriteAllText(path, header + text);
+            return path;
+        }
+        catch (Exception e) { Log.Write("📝 no pude guardar la transcripción: " + e.Message); return null; }
     }
 
     // ================================================================ IPlatformBridge

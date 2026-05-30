@@ -18,6 +18,7 @@ public sealed class SlimeView
     public bool Blink;
     public int Facing = 1;       // 1 derecha, -1 izquierda
     public double BodyOffsetX;   // para pasear
+    public bool Listening;       // escuchando una reunión: orejitas + ondas de sonido
 }
 
 /// <summary>
@@ -94,6 +95,39 @@ public sealed class SlimeRenderer
         Fill((int)cx - 4, shineY - 1, skin.Shine);
 
         DrawFace(v, (int)cx, height, footY, ghost);
+
+        if (v.Listening && !ghost) DrawListening(v, (int)cx, height, footY, skin);
+    }
+
+    /// <summary>Orejitas que se inclinan (twitch) + ondas de sonido que pulsan.</summary>
+    private void DrawListening(SlimeView v, int cx, double height, int footY, Skin skin)
+    {
+        var topY = footY + (int)height - 1;
+        var tw = (v.Tick / 9 % 2 == 0) ? 0 : 1;   // movimiento de la punta
+
+        void Ear(int x0, int lean)
+        {
+            for (var oy = 0; oy < 4; oy++)
+            {
+                var lx = x0 + (oy >= 2 ? lean : 0);
+                Fill(lx, topY + oy, skin.BodyDark);                                  // borde
+                Fill(lx + 1, topY + oy, oy is 1 or 2 ? Palette.Heart : skin.Body);   // interior rosita
+            }
+        }
+        Ear(cx - 6, -tw);   // izquierda
+        Ear(cx + 4, tw);    // derecha
+
+        // ondas de sonido ")))" a la derecha de la cabeza, pulsando
+        var wx = cx + 9;
+        var wy = footY + (int)(height * 0.52);
+        var phase = v.Tick / 7 % 3;   // 1..3 ondas visibles
+        for (var i = 0; i <= phase; i++)
+        {
+            // un arco ")" simple
+            Fill(wx + i * 2, wy + 1, Palette.EyeWhite);
+            Fill(wx + i * 2 + 1, wy, Palette.EyeWhite);
+            Fill(wx + i * 2, wy - 1, Palette.EyeWhite);
+        }
     }
 
     private void DrawFace(SlimeView v, int cx, double height, int footY, bool ghost)

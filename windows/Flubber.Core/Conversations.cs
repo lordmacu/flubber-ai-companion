@@ -12,6 +12,7 @@ public sealed class Msg
     public string Role { get; set; } = "user";   // "user" | "assistant"
     public string Content { get; set; } = "";
     public string? ImagePath { get; set; }        // captura adjunta (thumbnail clicable)
+    public string? FilePath { get; set; }         // archivo adjunto clicable (transcripción .txt)
 }
 
 public sealed class Conversation
