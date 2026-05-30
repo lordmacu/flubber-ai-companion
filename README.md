@@ -16,6 +16,10 @@ it in a built-in chat.
 > have it read your screen and answer, and the people on the other end see nothing
 > but your normal desktop.
 
+<p align="center">
+  <img src="menu.png" alt="Flubber's right-click menu and speech bubble" width="420">
+</p>
+
 ---
 
 ## 🚀 Build and run
@@ -55,6 +59,12 @@ sick, happy…).
 
 - **Physics:** it can't leave the screen; if you drag it against an edge and let go, it **sticks to the wall and slides** down to the bottom 🫧.
 - While it "works" in the chat, it animates in place: **it sways while searching**, **turns its back while looking at your screen**, **moves its mouth while talking** and pulses while thinking.
+
+<p align="center">
+  <img src="dance.png" alt="Flubber dancing with music notes" width="300">
+  &nbsp;&nbsp;
+  <img src="think.png" alt="Flubber thinking while it works" width="300">
+</p>
 
 ## 🎨 Skins
 

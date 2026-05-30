@@ -32,12 +32,18 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Firma AD-HOC: para una app local no dispara el aviso de "malware" de Gatekeeper
-# (que sí aparece al firmar con un certificado de desarrollo no notarizado).
-# Puedes forzar una identidad estable con FLUBBER_SIGN_ID si la tienes notarizada.
-if [ -n "$FLUBBER_SIGN_ID" ]; then
-  codesign --force --deep --sign "$FLUBBER_SIGN_ID" "$APP" 2>/dev/null || true
+# Firma con una identidad ESTABLE si está disponible (así los permisos del sistema
+# —Grabación de pantalla, Automatización— SOBREVIVEN a recompilaciones, porque el
+# permiso se ata a la identidad y no a la huella del binario).
+# Importante: SIN hardened runtime (eso disparaba el aviso de "malware").
+# En CI (sin certificado) cae a firma ad-hoc automáticamente.
+SIGN_ID="${FLUBBER_SIGN_ID:-A3ADB32024EDBDC374BE1075BC8189E037245868}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  echo "🔏 Firmando con identidad estable…"
+  codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
+    || codesign --force --deep --sign - "$APP" 2>/dev/null || true
 else
+  echo "🔏 Firma ad-hoc (sin identidad estable)…"
   codesign --force --deep --sign - "$APP" 2>/dev/null || true
 fi
 
