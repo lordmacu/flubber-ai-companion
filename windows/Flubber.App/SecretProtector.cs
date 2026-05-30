@@ -30,6 +30,6 @@ public static class SecretProtector
             var dec = ProtectedData.Unprotect(Convert.FromBase64String(stored[Prefix.Length..]), null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(dec);
         }
-        catch { return stored; }
+        catch { return ""; }   // irrecuperable (p.ej. otro usuario): forzar reconfigurar, no corromper
     }
 }

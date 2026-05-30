@@ -61,4 +61,7 @@ internal static class Native
 
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    public static extern bool DestroyIcon(IntPtr hIcon);   // liberar el HICON de GetHicon()
 }

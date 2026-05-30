@@ -280,13 +280,22 @@ struct PetStats: Codable {
     }
 
     /// Carga el estado y aplica el decaimiento del tiempo que estuvo cerrado.
+    /// El catch-up se hace en sub-pasos (~10 min simulados) para que los eventos
+    /// probabilísticos (popó, enfermedad, muerte) se acumulen de forma realista
+    /// en vez de "un solo tick gigante" que satura las probabilidades.
     static func load() -> PetStats {
         guard let data = try? Data(contentsOf: fileURL),
               var s = try? JSONDecoder().decode(PetStats.self, from: data) else {
             return PetStats()
         }
-        let elapsed = min(Date().timeIntervalSince(s.lastUpdate), Tuning.offlineCapSeconds)
-        if elapsed > 0 { _ = s.tick(dt: elapsed) }
+        var remaining = min(Date().timeIntervalSince(s.lastUpdate), Tuning.offlineCapSeconds)
+        let chunk = max(1.0, 600.0 / Tuning.timeScale)      // ≈10 min simulados por paso
+        while remaining > 0, !s.isDead {
+            let step = min(remaining, chunk)
+            _ = s.tick(dt: step)
+            remaining -= step
+        }
+        s.lastUpdate = Date()
         return s
     }
 

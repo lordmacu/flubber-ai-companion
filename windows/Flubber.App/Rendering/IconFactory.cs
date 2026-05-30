@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using Flubber.App.Interop;
 using SkiaSharp;
 
 namespace Flubber.App.Rendering;
@@ -25,7 +26,8 @@ public static class IconFactory
             bmp.UnlockBits(bd);
 
             var hicon = bmp.GetHicon();
-            return (Icon)Icon.FromHandle(hicon).Clone();
+            try { return (Icon)Icon.FromHandle(hicon).Clone(); }
+            finally { Native.DestroyIcon(hicon); }
         }
         catch
         {

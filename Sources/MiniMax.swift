@@ -208,6 +208,7 @@ final class StreamSession: NSObject, URLSessionDataDelegate {
     private let onDone: (LLMResult?) -> Void
     private var session: URLSession?
     private var finished = false
+    private var httpStatus = 200
 
     init(onDelta: @escaping (String) -> Void, onDone: @escaping (LLMResult?) -> Void) {
         self.onDelta = onDelta; self.onDone = onDone
@@ -215,6 +216,11 @@ final class StreamSession: NSObject, URLSessionDataDelegate {
     func start(_ request: URLRequest) {
         session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
         session?.dataTask(with: request).resume()
+    }
+    func urlSession(_ s: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
+        completionHandler(.allow)
     }
     func urlSession(_ s: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         buffer.append(data)
@@ -249,8 +255,9 @@ final class StreamSession: NSObject, URLSessionDataDelegate {
         }
     }
     func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if error != nil, !finished { finished = true; Log.write("STREAM error"); onDone(nil) }
-        else { finishOnce() }
+        if (error != nil || httpStatus >= 300), !finished {
+            finished = true; Log.write("STREAM http \(httpStatus) \(error?.localizedDescription ?? "")"); onDone(nil)
+        } else { finishOnce() }
         session?.finishTasksAndInvalidate()
     }
     private func finishOnce() {
@@ -418,6 +425,7 @@ final class OpenAIStreamSession: NSObject, URLSessionDataDelegate {
     private let onDone: (LLMResult?) -> Void
     private var session: URLSession?
     private var finished = false
+    private var httpStatus = 200
 
     init(onDelta: @escaping (String) -> Void, onDone: @escaping (LLMResult?) -> Void) {
         self.onDelta = onDelta; self.onDone = onDone
@@ -425,6 +433,11 @@ final class OpenAIStreamSession: NSObject, URLSessionDataDelegate {
     func start(_ request: URLRequest) {
         session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
         session?.dataTask(with: request).resume()
+    }
+    func urlSession(_ s: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
+        completionHandler(.allow)
     }
     func urlSession(_ s: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         buffer.append(data)
@@ -457,8 +470,9 @@ final class OpenAIStreamSession: NSObject, URLSessionDataDelegate {
         }
     }
     func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if error != nil, !finished { finished = true; Log.write("STREAM error"); onDone(nil) }
-        else { finishOnce() }
+        if (error != nil || httpStatus >= 300), !finished {
+            finished = true; Log.write("STREAM http \(httpStatus) \(error?.localizedDescription ?? "")"); onDone(nil)
+        } else { finishOnce() }
         session?.finishTasksAndInvalidate()
     }
     private func finishOnce() {

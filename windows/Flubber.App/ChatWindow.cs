@@ -72,13 +72,25 @@ public sealed class ChatWindow : Window
         root.Children.Add(_scroll);
         Content = root;
 
-        foreach (var m in _conv.Messages) AddBubble(m.Role, m.Content);
+        foreach (var m in _conv.Messages)
+        {
+            AddBubble(m.Role, m.Content);
+            if (!string.IsNullOrEmpty(m.ImagePath)) AddImage(m.ImagePath!);
+        }
         _agent.SeedHistory(_conv.Messages.Select(m => (m.Role, m.Content)));   // memoria del LLM
         Loaded += (_, _) => _input.Focus();
     }
 
-    /// <summary>Muestra el thumbnail de una captura adjuntada por la herramienta ver_pantalla.</summary>
-    public void AddImage(string path)
+    /// <summary>Adjunta una captura (la dibuja y la persiste en el último mensaje de usuario).</summary>
+    public void AttachCapture(string path)
+    {
+        AddImage(path);
+        var lastUser = _conv.Messages.LastOrDefault(m => m.Role == "user");
+        if (lastUser != null) { lastUser.ImagePath = path; _store.Save(); }
+    }
+
+    /// <summary>Dibuja el thumbnail de una captura (sin persistir).</summary>
+    private void AddImage(string path)
     {
         try
         {

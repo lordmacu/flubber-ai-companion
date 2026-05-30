@@ -1848,7 +1848,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // saludo al abrir
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-            guard let v = self?.view, !v.stats.isDead, v.stats.stage != .egg else { return }
+            guard let v = self?.view else { return }
+            if v.stats.isDead {                                   // murió mientras estuvo cerrado
+                self?.notify("💀 \(v.stats.displayName) " + Loc.t("ha muerto", "has died"),
+                             Loc.t("Lo descuidaste demasiado… toca 🥚 para empezar de nuevo.",
+                                   "Too neglected… tap 🥚 to start over."))
+                return
+            }
+            guard v.stats.stage != .egg else { return }
             v.react(.greeting)
         }
 

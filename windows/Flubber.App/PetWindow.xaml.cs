@@ -148,14 +148,26 @@ public partial class PetWindow : Window, IPlatformBridge
         Surface.InvalidateVisual();
     }
 
-    /// <summary>Límites de roaming: horizontal en toda la pantalla virtual (multi-monitor); suelo en el área de trabajo.</summary>
+    /// <summary>Límites de roaming del MONITOR actual (área de trabajo), en DIP. Soporta multi-monitor y DPI mixto.</summary>
     private (double Left, double Right, double Ground) Bounds()
     {
-        var wa = SystemParameters.WorkArea;
-        var left = SystemParameters.VirtualScreenLeft;
-        var right = SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - Width;
-        if (right < left) right = left;
-        return (left, right, wa.Bottom - Height);
+        try
+        {
+            var src = PresentationSource.FromVisual(this);
+            if (src?.CompositionTarget != null)
+            {
+                var wa = Forms.Screen.FromHandle(_hwnd).WorkingArea;   // px del monitor bajo la ventana
+                var t = src.CompositionTarget.TransformFromDevice;     // device px -> DIP
+                var tl = t.Transform(new System.Windows.Point(wa.Left, wa.Top));
+                var br = t.Transform(new System.Windows.Point(wa.Right, wa.Bottom));
+                var left = tl.X;
+                var right = Math.Max(left, br.X - Width);
+                return (left, right, br.Y - Height);
+            }
+        }
+        catch { }
+        var p = SystemParameters.WorkArea;   // respaldo: monitor primario
+        return (p.Left, Math.Max(p.Left, p.Right - Width), p.Bottom - Height);
     }
 
     /// <summary>Mueve la ventana: pasear/rodar, caída con gravedad y escurrirse por la pared.</summary>
@@ -379,6 +391,7 @@ public partial class PetWindow : Window, IPlatformBridge
         {
             _client = BackendFactory.Make(_cfg);
             _agent = new Agent(_client, this);
+            _chat?.Close();   // el chat abierto tenía el backend viejo; al reabrir usa el nuevo
         }
     }
 
@@ -423,7 +436,7 @@ public partial class PetWindow : Window, IPlatformBridge
     public Task<(string? Base64, string? Path)> CaptureScreenAsync(string? appHint)
         => Flubber.App.Platform.ScreenCapture.CaptureAsync(appHint);
 
-    public void AttachShot(string path) => Dispatcher.Invoke(() => _chat?.AddImage(path));
+    public void AttachShot(string path) => Dispatcher.Invoke(() => _chat?.AttachCapture(path));
 
     public string ControlSlime(string accion, string tema) => Dispatcher.Invoke(() =>
     {
