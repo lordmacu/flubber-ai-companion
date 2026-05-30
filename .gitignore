@@ -1,5 +1,7 @@
 # Build output
-*.app/
+# (anclado a la raíz: el filesystem de macOS es case-insensitive y "*.app/"
+#  también ignoraba windows/Flubber.App/ — el proyecto C#)
+/Flubber.app/
 *.app.zip
 *.dmg
 dmg-stage/
