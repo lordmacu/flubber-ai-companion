@@ -93,6 +93,12 @@ struct AIConfig: Codable {
     // Claude (Anthropic)
     var claudeKey: String? = nil
     var claudeModel: String? = nil            // p.ej. "claude-sonnet-4-6"
+    // OpenAI (ChatGPT)
+    var openaiKey: String? = nil
+    var openaiModel: String? = nil
+    // DeepSeek
+    var deepseekKey: String? = nil
+    var deepseekModel: String? = nil
     var lang: String? = nil                   // nil=sistema, "es", "en"
     // "permitir siempre" por categoría (no volver a preguntar)
     var allowBrowser: Bool? = nil
@@ -103,11 +109,20 @@ struct AIConfig: Codable {
 
     var claudeKeyValue: String { claudeKey ?? "" }
     var claudeModelValue: String { (claudeModel?.isEmpty == false) ? claudeModel! : "claude-haiku-4-5-20251001" }
+    var openaiKeyValue: String { openaiKey ?? "" }
+    var openaiModelValue: String { (openaiModel?.isEmpty == false) ? openaiModel! : "gpt-4o" }
+    var deepseekKeyValue: String { deepseekKey ?? "" }
+    var deepseekModelValue: String { (deepseekModel?.isEmpty == false) ? deepseekModel! : "deepseek-chat" }
 
     var isConfigured: Bool {
-        provider == "claude"
-            ? !claudeKeyValue.trimmingCharacters(in: .whitespaces).isEmpty
-            : !apiKey.trimmingCharacters(in: .whitespaces).isEmpty
+        let k: String
+        switch provider {
+        case "claude": k = claudeKeyValue
+        case "openai": k = openaiKeyValue
+        case "deepseek": k = deepseekKeyValue
+        default: k = apiKey                  // minimax
+        }
+        return !k.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     static var fileURL: URL {
@@ -168,10 +183,15 @@ protocol AIBackend: AnyObject {
     func test(completion: @escaping (Bool, String) -> Void)
 }
 
-// Ambos proveedores usan el formato Anthropic Messages:
-//  - Claude  → https://api.anthropic.com/v1/messages
-//  - MiniMax → https://api.minimax.io/anthropic/v1/messages  (recomendado para M2)
-func makeBackend(_ config: AIConfig) -> AIBackend { AnthropicBackend(config: config) }
+// Enruta al backend según el proveedor:
+//  - claude / minimax → formato Anthropic Messages
+//  - openai / deepseek → formato OpenAI Chat Completions
+func makeBackend(_ config: AIConfig) -> AIBackend {
+    switch config.provider {
+    case "openai", "deepseek": return OpenAIBackend(config: config)
+    default: return AnthropicBackend(config: config)   // claude, minimax
+    }
+}
 
 // MARK: - Parser SSE para streaming real (formato Anthropic Messages)
 
@@ -245,72 +265,115 @@ func jsonObject(_ s: String) -> [String: Any] {
     (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [String: Any] ?? [:]
 }
 
-// MARK: - MiniMax / OpenAI-compatible
+// MARK: - OpenAI / DeepSeek (formato OpenAI Chat Completions)
 
 final class OpenAIBackend: AIBackend {
     var config: AIConfig
     init(config: AIConfig) { self.config = config }
-    var isConfigured: Bool { !config.apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    private func post(_ body: [String: Any], timeout: TimeInterval, completion: @escaping (Data?) -> Void) {
-        guard isConfigured, let url = URL(string: config.baseURL + "/chat/completions"),
-              let payload = try? JSONSerialization.data(withJSONObject: body) else { completion(nil); return }
+    var isOpenAI: Bool { config.provider == "openai" }
+    var base: String { isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com" }
+    var key: String { isOpenAI ? config.openaiKeyValue : config.deepseekKeyValue }
+    var model: String { isOpenAI ? config.openaiModelValue : config.deepseekModelValue }
+    var name: String { isOpenAI ? "OpenAI" : "DeepSeek" }
+    var chatURL: String { base + "/chat/completions" }
+    var isConfigured: Bool { !key.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private func makeRequest(_ body: [String: Any], timeout: TimeInterval) -> URLRequest? {
+        guard isConfigured, let url = URL(string: chatURL),
+              let payload = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer " + config.apiKey, forHTTPHeaderField: "Authorization")
+        req.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
         req.httpBody = payload
-        URLSession.shared.dataTask(with: req) { data, _, err in completion(err == nil ? data : nil) }.resume()
+        return req
+    }
+    private func post(_ body: [String: Any], timeout: TimeInterval, completion: @escaping (Data?) -> Void) {
+        guard let req = makeRequest(body, timeout: timeout) else { completion(nil); return }
+        Log.write("→ \(name) POST \(chatURL) model=\(model)")
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if let err = err { Log.write("← \(name) ERROR \(err.localizedDescription)") }
+            else { Log.write("← \(name) HTTP \(code) \(String((data.flatMap { String(data: $0, encoding: .utf8) } ?? "").prefix(300)))") }
+            completion(err == nil ? data : nil)
+        }.resume()
     }
 
-    func chat(system: String, history: [(String, String)] = [], user: String? = nil,
-              maxTokens: Int = 120, completion: @escaping (String?) -> Void) {
-        var msgs: [[String: String]] = [["role": "system", "content": system]]
-        for (r, c) in history { msgs.append(["role": r, "content": c]) }
-        if let user { msgs.append(["role": "user", "content": user]) }
-        post(["model": config.model, "messages": msgs, "max_tokens": maxTokens, "temperature": 1.0], timeout: 20) { data in
-            DispatchQueue.main.async { completion(data.flatMap { Self.parseText($0) }) }
-        }
-    }
-
-    func complete(messages: [AIMessage], tools: [ToolDef]?, maxTokens: Int = 800,
-                  completion: @escaping (LLMResult?) -> Void) {
+    private func oaiMessages(_ messages: [AIMessage]) -> [[String: Any]] {
         var msgs: [[String: Any]] = []
         for m in messages {
             if m.role == "assistant", !m.toolCalls.isEmpty {
                 msgs.append(["role": "assistant", "content": m.content,
-                             "tool_calls": m.toolCalls.map { ["id": $0.id, "type": "function",
-                                                              "function": ["name": $0.name, "arguments": $0.arguments]] }])
+                             "tool_calls": m.toolCalls.map { ["id": $0.id, "type": "function", "function": ["name": $0.name, "arguments": $0.arguments]] }])
             } else if m.role == "tool" {
                 msgs.append(["role": "tool", "tool_call_id": m.toolCallId ?? "", "content": m.content])
+            } else if m.role == "user", let img = m.imageBase64 {
+                msgs.append(["role": "user", "content": [
+                    ["type": "text", "text": m.content],
+                    ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(img)"]]]])
             } else {
                 msgs.append(["role": m.role, "content": m.content])
             }
         }
-        var body: [String: Any] = ["model": config.model, "messages": msgs, "max_tokens": maxTokens, "temperature": 1.0]
+        return msgs
+    }
+    private func body(_ messages: [AIMessage], _ tools: [ToolDef]?, _ maxTokens: Int, stream: Bool) -> [String: Any] {
+        var b: [String: Any] = ["model": model, "messages": oaiMessages(messages), "max_tokens": maxTokens, "temperature": 0.3]
+        if stream { b["stream"] = true }
         if let tools = tools, !tools.isEmpty {
-            body["tools"] = tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description, "parameters": $0.parameters]] }
-            body["tool_choice"] = "auto"
+            b["tools"] = tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description, "parameters": $0.parameters]] }
+            b["tool_choice"] = "auto"
         }
-        post(body, timeout: 60) { data in
+        return b
+    }
+
+    func chat(system: String, history: [(String, String)] = [], user: String? = nil,
+              maxTokens: Int = 120, completion: @escaping (String?) -> Void) {
+        var msgs: [[String: Any]] = [["role": "system", "content": system]]
+        for (r, c) in history { msgs.append(["role": r, "content": c]) }
+        if let user { msgs.append(["role": "user", "content": user]) }
+        post(["model": model, "messages": msgs, "max_tokens": maxTokens, "temperature": 1.0], timeout: 20) { data in
+            DispatchQueue.main.async { completion(data.flatMap { Self.parseText($0) }) }
+        }
+    }
+    func complete(messages: [AIMessage], tools: [ToolDef]?, maxTokens: Int = 800, completion: @escaping (LLMResult?) -> Void) {
+        post(body(messages, tools, maxTokens, stream: false), timeout: 60) { data in
             DispatchQueue.main.async { completion(data.flatMap { Self.parseResult($0) }) }
         }
     }
-
     func completeStream(messages: [AIMessage], tools: [ToolDef]?, maxTokens: Int = 2000,
                         onDelta: @escaping (String) -> Void, completion: @escaping (LLMResult?) -> Void) {
-        complete(messages: messages, tools: tools, maxTokens: maxTokens, completion: completion)  // sin stream real
+        guard let req = makeRequest(body(messages, tools, maxTokens, stream: true), timeout: 120) else {
+            DispatchQueue.main.async { completion(nil) }; return
+        }
+        Log.write("→ STREAM \(name) model=\(model)")
+        OpenAIStreamSession(onDelta: onDelta, onDone: completion).start(req)
     }
     func vision(prompt: String, imageBase64: String, completion: @escaping (String?) -> Void) {
-        DispatchQueue.main.async { completion(nil) }   // sin visión por este backend
+        func done(_ s: String?) { DispatchQueue.main.async { completion(s) } }
+        guard isConfigured, isOpenAI else { done(nil); return }   // DeepSeek no tiene visión
+        let b: [String: Any] = ["model": model, "max_tokens": 1024, "temperature": 0.2, "messages": [[
+            "role": "user", "content": [
+                ["type": "text", "text": prompt],
+                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(imageBase64)"]]]]]]
+        post(b, timeout: 60) { data in done(data.flatMap { Self.parseText($0) }) }
     }
     func webSearch(_ query: String, completion: @escaping (String) -> Void) { WebTools.search(query, completion) }
 
     func test(completion: @escaping (Bool, String) -> Void) {
-        chat(system: "Responde solo: ok", history: [], user: "ping", maxTokens: 8) { r in
-            if let r = r, !r.isEmpty { completion(true, "Conexión exitosa ✅ (\(r))") }
-            else { completion(false, "Sin respuesta. Revisa clave/modelo/red.") }
+        guard let req = makeRequest(["model": model, "messages": [["role": "user", "content": "ping"]], "max_tokens": 8], timeout: 20) else {
+            DispatchQueue.main.async { completion(false, "Falta la clave.") }; return
         }
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            DispatchQueue.main.async {
+                if let err = err { completion(false, "Red: \(err.localizedDescription)"); return }
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                let snip = String((data.flatMap { String(data: $0, encoding: .utf8) } ?? "").prefix(220))
+                if code == 200, let t = data.flatMap({ Self.parseText($0) }), !t.isEmpty { completion(true, "Conexión exitosa ✅ (\(t))") }
+                else { completion(false, "HTTP \(code): \(snip)") }
+            }
+        }.resume()
     }
 
     static func parseText(_ data: Data) -> String? {
@@ -334,6 +397,68 @@ final class OpenAIBackend: AIBackend {
             }
         }
         return LLMResult(content: msg["content"] as? String, toolCalls: calls)
+    }
+}
+
+// MARK: - Parser SSE para OpenAI / DeepSeek
+
+final class OpenAIStreamSession: NSObject, URLSessionDataDelegate {
+    private var buffer = Data()
+    private var text = ""
+    private var tools: [Int: (id: String, name: String, args: String)] = [:]
+    private let onDelta: (String) -> Void
+    private let onDone: (LLMResult?) -> Void
+    private var session: URLSession?
+    private var finished = false
+
+    init(onDelta: @escaping (String) -> Void, onDone: @escaping (LLMResult?) -> Void) {
+        self.onDelta = onDelta; self.onDone = onDone
+    }
+    func start(_ request: URLRequest) {
+        session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
+        session?.dataTask(with: request).resume()
+    }
+    func urlSession(_ s: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        buffer.append(data)
+        while let r = buffer.firstRange(of: Data([0x0a])) {
+            let line = buffer.subdata(in: buffer.startIndex..<r.lowerBound)
+            buffer.removeSubrange(buffer.startIndex..<r.upperBound)
+            handle(String(data: line, encoding: .utf8) ?? "")
+        }
+    }
+    private func handle(_ raw: String) {
+        let line = raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+        guard line.hasPrefix("data:") else { return }
+        let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+        if payload == "[DONE]" { finishOnce(); return }
+        guard let d = payload.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let choices = obj["choices"] as? [[String: Any]], let first = choices.first,
+              let delta = first["delta"] as? [String: Any] else { return }
+        if let c = delta["content"] as? String, !c.isEmpty { text += c; onDelta(c) }
+        if let tcs = delta["tool_calls"] as? [[String: Any]] {
+            for tc in tcs {
+                let idx = tc["index"] as? Int ?? 0
+                if tools[idx] == nil { tools[idx] = ("", "", "") }
+                if let id = tc["id"] as? String { tools[idx]?.id = id }
+                if let fn = tc["function"] as? [String: Any] {
+                    if let n = fn["name"] as? String { tools[idx]?.name += n }
+                    if let a = fn["arguments"] as? String { tools[idx]?.args += a }
+                }
+            }
+        }
+    }
+    func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil, !finished { finished = true; Log.write("STREAM error"); onDone(nil) }
+        else { finishOnce() }
+        session?.finishTasksAndInvalidate()
+    }
+    private func finishOnce() {
+        guard !finished else { return }; finished = true
+        let calls = tools.sorted { $0.key < $1.key }.map {
+            ToolCall(id: $0.value.id, name: $0.value.name, arguments: $0.value.args.isEmpty ? "{}" : $0.value.args)
+        }
+        onDone(LLMResult(content: text.isEmpty ? nil : text, toolCalls: calls))
     }
 }
 

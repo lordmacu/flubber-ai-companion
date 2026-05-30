@@ -2007,17 +2007,21 @@ final class ConfigController: NSObject, NSWindowDelegate {
     let onSave: (AIConfig) -> Void
 
     private var providerPopup: NSPopUpButton!
-    private var mmBox: NSView!
-    private var clBox: NSView!
-    private var mmKeyField: NSSecureTextField!
-    private var mmModelPopup: NSPopUpButton!
-    private var clKeyField: NSSecureTextField!
-    private var clModelPopup: NSPopUpButton!
+    private var mmBox: NSView!, clBox: NSView!, oaBox: NSView!, dsBox: NSView!
+    private var mmKeyField: NSSecureTextField!, clKeyField: NSSecureTextField!
+    private var oaKeyField: NSSecureTextField!, dsKeyField: NSSecureTextField!
+    private var mmModelPopup: NSPopUpButton!, clModelPopup: NSPopUpButton!
+    private var oaModelPopup: NSPopUpButton!, dsModelPopup: NSPopUpButton!
     private var statusLabel: NSTextField!
 
+    // orden de proveedores en el popup
+    private let providers = ["minimax", "claude", "openai", "deepseek"]
     private let mmTitles = ["MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2"]
     private let clTitles = ["Haiku 4.5 (económico)", "Sonnet 4.6", "Opus 4.8"]
     private let clValues = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"]
+    private let oaModels = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"]
+    private let dsModels = ["deepseek-chat", "deepseek-reasoner"]
+    private func provIndex() -> Int { providerPopup.indexOfSelectedItem }
 
     init(config: AIConfig, onSave: @escaping (AIConfig) -> Void) {
         self.config = config; self.onSave = onSave
@@ -2043,18 +2047,19 @@ final class ConfigController: NSObject, NSWindowDelegate {
         c.addSubview(label("Elige el proveedor y pega tu clave. Se guarda en un archivo local protegido (solo tú).", 20, H-30, W-40, bold: true))
 
         c.addSubview(label("Proveedor:", 20, H-64, 90))
-        providerPopup = NSPopUpButton(frame: NSRect(x: 110, y: H-68, width: 180, height: 26))
-        providerPopup.addItems(withTitles: ["MiniMax", "Claude (Anthropic)"])
+        providerPopup = NSPopUpButton(frame: NSRect(x: 110, y: H-68, width: 200, height: 26))
+        providerPopup.addItems(withTitles: ["MiniMax", "Claude (Anthropic)", "ChatGPT (OpenAI)", "DeepSeek"])
         providerPopup.target = self; providerPopup.action = #selector(providerChanged)
         c.addSubview(providerPopup)
 
         let console = NSButton(title: "Abrir consola ↗", target: self, action: #selector(openConsole))
         console.frame = NSRect(x: W-160, y: H-69, width: 140, height: 28); c.addSubview(console)
 
-        // Ambas secciones ocupan el mismo espacio; solo se ve la del proveedor activo.
+        // Las secciones ocupan el mismo espacio; solo se ve la del proveedor activo.
         let boxFrame = NSRect(x: 20, y: 110, width: W-40, height: 110)
         mmBox = NSView(frame: boxFrame); clBox = NSView(frame: boxFrame)
-        c.addSubview(mmBox); c.addSubview(clBox)
+        oaBox = NSView(frame: boxFrame); dsBox = NSView(frame: boxFrame)
+        c.addSubview(mmBox); c.addSubview(clBox); c.addSubview(oaBox); c.addSubview(dsBox)
 
         func boxLabel(_ s: String, _ y: CGFloat, bold: Bool = false) -> NSTextField {
             let l = NSTextField(labelWithString: s); l.frame = NSRect(x: 0, y: y, width: boxFrame.width, height: 18)
@@ -2077,6 +2082,22 @@ final class ConfigController: NSObject, NSWindowDelegate {
         clModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 220, height: 26))
         clModelPopup.addItems(withTitles: clTitles); clBox.addSubview(clModelPopup)
 
+        // ChatGPT (OpenAI)
+        oaBox.addSubview(boxLabel("Clave API de OpenAI (sk-…):", 88, bold: true))
+        oaKeyField = PastableSecureTextField(frame: NSRect(x: 0, y: 58, width: boxFrame.width, height: 24))
+        oaKeyField.placeholderString = "clave de OpenAI (⌘V para pegar)"; oaBox.addSubview(oaKeyField)
+        let oaModelLbl = boxLabel("Modelo:", 26); oaModelLbl.frame.size.width = 64; oaBox.addSubview(oaModelLbl)
+        oaModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 220, height: 26))
+        oaModelPopup.addItems(withTitles: oaModels); oaBox.addSubview(oaModelPopup)
+
+        // DeepSeek
+        dsBox.addSubview(boxLabel("Clave API de DeepSeek (sk-…):", 88, bold: true))
+        dsKeyField = PastableSecureTextField(frame: NSRect(x: 0, y: 58, width: boxFrame.width, height: 24))
+        dsKeyField.placeholderString = "clave de DeepSeek (⌘V para pegar)"; dsBox.addSubview(dsKeyField)
+        let dsModelLbl = boxLabel("Modelo:", 26); dsModelLbl.frame.size.width = 64; dsBox.addSubview(dsModelLbl)
+        dsModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 220, height: 26))
+        dsModelPopup.addItems(withTitles: dsModels); dsBox.addSubview(dsModelPopup)
+
         statusLabel = NSTextField(labelWithString: "")
         statusLabel.frame = NSRect(x: 20, y: 60, width: W-40, height: 40)
         statusLabel.textColor = .secondaryLabelColor; statusLabel.maximumNumberOfLines = 2
@@ -2093,19 +2114,22 @@ final class ConfigController: NSObject, NSWindowDelegate {
     }
 
     private func updateVisibility() {
-        let claude = providerPopup.indexOfSelectedItem == 1
-        mmBox.isHidden = claude; clBox.isHidden = !claude
+        let i = provIndex()
+        mmBox.isHidden = i != 0; clBox.isHidden = i != 1; oaBox.isHidden = i != 2; dsBox.isHidden = i != 3
     }
 
     @objc private func providerChanged() { updateVisibility() }
 
     func show() {
-        providerPopup.selectItem(at: config.provider == "claude" ? 1 : 0)
+        providerPopup.selectItem(at: max(0, providers.firstIndex(of: config.provider) ?? 0))
         mmKeyField.stringValue = config.apiKey
-        mmModelPopup.selectItem(withTitle: config.model)
-        if mmModelPopup.indexOfSelectedItem < 0 { mmModelPopup.selectItem(at: 1) }
+        mmModelPopup.selectItem(withTitle: config.model); if mmModelPopup.indexOfSelectedItem < 0 { mmModelPopup.selectItem(at: 1) }
         clKeyField.stringValue = config.claudeKeyValue
-        if let i = clValues.firstIndex(of: config.claudeModelValue) { clModelPopup.selectItem(at: i) } else { clModelPopup.selectItem(at: 0) }
+        clModelPopup.selectItem(at: clValues.firstIndex(of: config.claudeModelValue) ?? 0)
+        oaKeyField.stringValue = config.openaiKeyValue
+        oaModelPopup.selectItem(withTitle: config.openaiModelValue); if oaModelPopup.indexOfSelectedItem < 0 { oaModelPopup.selectItem(at: 0) }
+        dsKeyField.stringValue = config.deepseekKeyValue
+        dsModelPopup.selectItem(withTitle: config.deepseekModelValue); if dsModelPopup.indexOfSelectedItem < 0 { dsModelPopup.selectItem(at: 0) }
         statusLabel.stringValue = config.isConfigured ? "Configurado ✅" : "Falta la clave del proveedor elegido."
         updateVisibility()
         NSApp.activate(ignoringOtherApps: true)
@@ -2114,18 +2138,26 @@ final class ConfigController: NSObject, NSWindowDelegate {
 
     private func current() -> AIConfig {
         var c = config
-        c.provider = providerPopup.indexOfSelectedItem == 1 ? "claude" : "minimax"
+        c.provider = providers[min(provIndex(), providers.count - 1)]
         c.apiKey = mmKeyField.stringValue
         c.model = mmModelPopup.titleOfSelectedItem ?? "MiniMax-M2.5"
         c.claudeKey = clKeyField.stringValue.isEmpty ? nil : clKeyField.stringValue
-        let ci = max(0, clModelPopup.indexOfSelectedItem)
-        c.claudeModel = clValues[min(ci, clValues.count - 1)]
+        c.claudeModel = clValues[min(max(0, clModelPopup.indexOfSelectedItem), clValues.count - 1)]
+        c.openaiKey = oaKeyField.stringValue.isEmpty ? nil : oaKeyField.stringValue
+        c.openaiModel = oaModelPopup.titleOfSelectedItem
+        c.deepseekKey = dsKeyField.stringValue.isEmpty ? nil : dsKeyField.stringValue
+        c.deepseekModel = dsModelPopup.titleOfSelectedItem
         return c
     }
 
     @objc private func openConsole() {
-        let claude = providerPopup.indexOfSelectedItem == 1
-        let url = claude ? "https://console.anthropic.com/settings/keys" : "https://platform.minimax.io/user-center/basic-information/interface-key"
+        let url: String
+        switch provIndex() {
+        case 1: url = "https://console.anthropic.com/settings/keys"
+        case 2: url = "https://platform.openai.com/api-keys"
+        case 3: url = "https://platform.deepseek.com/api_keys"
+        default: url = "https://platform.minimax.io/user-center/basic-information/interface-key"
+        }
         if let u = URL(string: url) { NSWorkspace.shared.open(u) }
     }
 

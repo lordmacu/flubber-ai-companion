@@ -1,163 +1,176 @@
-# 🟢 Flubber — mascota slime con IA para macOS
+# 🟢 Flubber — AI slime pet for macOS
 
-Flubber es una **mascota de escritorio** pixel-art para macOS, hecha 100% en
-**Swift + AppKit** (sin archivos de imagen: todo el arte se dibuja por código).
-No es solo un adorno: es un **Tamagotchi** que vive en tiempo real **y** un
-**agente de IA** capaz de buscar en internet, ver tu pantalla, controlar el
-navegador y ejecutar acciones — todo conversando con él en un chat integrado.
+Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit**
+(no image files: all the art is drawn in code). It's not just an ornament: it's a
+**Tamagotchi** that lives in real time **and** an **AI agent** that can search the
+web, see your screen, control your browser and run actions — all by chatting with
+it in a built-in chat.
 
 ![build](https://img.shields.io/badge/build-swiftc-orange) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue)
 
+> 🕵️ **Invisible on screen captures & screen shares.** Flubber's window does
+> **not** appear in screenshots, screen recordings, or screen sharing — Google
+> Meet, Zoom, Chrome, QuickTime and the like. Only *you* see it on your own
+> display. That makes it especially handy when you're in an **interview** (or any
+> shared-screen call) and need to quietly use an AI: you can chat with Flubber,
+> have it read your screen and answer, and the people on the other end see nothing
+> but your normal desktop.
+
 ---
 
-## 🚀 Compilar y ejecutar
+## 🚀 Build and run
 
 ```bash
-./build.sh        # compila y crea Flubber.app
-open Flubber.app  # lánzalo (vive en la barra de menús: icono 🟢)
+./build.sh        # compiles and creates Flubber.app
+open Flubber.app  # launch it (lives in the menu bar: 🟢 icon)
 ```
 
-Requiere macOS 12+ y las herramientas de línea de comandos de Xcode (`swiftc`).
+Requires macOS 12+ and the Xcode command line tools (`swiftc`).
 
 ---
 
-## 🐹 Tamagotchi (vida real)
+## 🐹 Tamagotchi (real time)
 
-Flubber tiene necesidades que **decaen en tiempo real**, incluso con la app
-cerrada (guarda su estado y calcula el tiempo transcurrido al abrir).
+Flubber has needs that **decay in real time**, even with the app closed (it saves
+its state and computes the elapsed time when you reopen).
 
-- **Necesidades:** 🍖 hambre · 😊 felicidad · ⚡ energía · 🫧 limpieza · ✚ salud.
-- **Ciclo de vida:** huevo → bebé → niño → adulto. Evoluciona según qué tan bien lo cuides; puede **enfermarse** y, si lo abandonas, **morir** (y renacer como huevo 🥚).
-- **Popó:** hace popó cada cierto tiempo; si no limpias, se ensucia y atrae moscas 🪰.
-- **Cuidados por gesto (menos botones):**
-  - 🎮 **Jugar** → doble clic sobre él.
-  - 🛁 **Lavar** → frota el mouse de lado a lado encima.
-  - 💤 **Dormir** → automático cuando se queda sin energía (despierta si lo tocas, le hablas o lo cuidas).
-  - 🍖 **Alimentar** / 💊 **Medicina** → aparecen como botones **solo cuando hace falta** (hambre / enfermo).
-- **HUD:** al pasar el mouse aparecen los botones de cuidado, que se **llenan de color** como indicador del nivel de cada necesidad.
-- **Clic derecho** sobre el slime → menú con todas las acciones (alimentar, jugar, bailar, pasear, rodar, chatear…).
-- **Avisos del sistema** cuando tiene hambre/sueño/está sucio o enfermo.
+- **Needs:** 🍖 hunger · 😊 happiness · ⚡ energy · 🫧 cleanliness · ✚ health.
+- **Life cycle:** egg → baby → child → adult. It evolves depending on how well you take care of it; it can **get sick** and, if you neglect it, **die** (and be reborn as an egg 🥚).
+- **Poop:** it poops every so often; if you don't clean up, it gets dirty and attracts flies 🪰.
+- **Care by gesture (fewer buttons):**
+  - 🎮 **Play** → double-click it.
+  - 🛁 **Wash** → rub the mouse side to side over it.
+  - 💤 **Sleep** → automatic when it runs out of energy (it wakes up if you touch it, talk to it, or care for it).
+  - 🍖 **Feed** / 💊 **Medicine** → appear as buttons **only when needed** (hungry / sick).
+- **HUD:** hovering shows the care buttons, which **fill with color** to indicate the level of each need.
+- **Right-click** the slime → menu with every action (feed, play, dance, walk, roll, chat…).
+- **System notifications** when it's hungry/sleepy/dirty or sick.
 
-## ✨ Animaciones
+## ✨ Animations
 
-Camina por la pantalla, **mira al cursor**, salta al hacer clic, suelta
-corazones con doble clic, baila 💃, rueda 🤸 (y se marea), persigue el cursor,
-bosteza, duerme con "Z", se sonroja, y reacciona con caras según su ánimo
-(triste, enfermo, feliz…).
+It walks across the screen, **looks at the cursor**, jumps when clicked, drops
+hearts on double-click, dances 💃, rolls 🤸 (and gets dizzy), chases the cursor,
+yawns, sleeps with "Z", blushes, and reacts with faces based on its mood (sad,
+sick, happy…).
 
-- **Físicas:** no puede salir de la pantalla; si lo arrastras contra un borde y lo sueltas, se **pega a la pared y se escurre** hasta abajo 🫧.
-- Mientras "trabaja" en el chat, se anima en su sitio: **se balancea al buscar**, **se gira de espaldas al mirar tu pantalla**, **mueve la boca al hablar** y pulsa al pensar.
+- **Physics:** it can't leave the screen; if you drag it against an edge and let go, it **sticks to the wall and slides** down to the bottom 🫧.
+- While it "works" in the chat, it animates in place: **it sways while searching**, **turns its back while looking at your screen**, **moves its mouth while talking** and pulses while thinking.
 
 ## 🎨 Skins
 
-Cambia de color (verde/azul/morado/rosa) o pídele a la IA **"crear un skin"** por
-tema (ej. "lava", "galaxia") y recolorea su cuerpo conservando las animaciones.
+Change its color (green/blue/purple/pink) or ask the AI to **"create a skin"** by
+theme (e.g. "lava", "galaxy") and it recolors its body while keeping the
+animations.
 
 ---
 
-## 🧠 IA (opcional)
+## 🧠 AI (optional)
 
-Flubber soporta **dos proveedores**, elegibles en la pantalla de configuración:
+Flubber is **designed primarily for MiniMax**, but it's also **compatible with
+other models** — it supports **two providers**, selectable on the settings screen:
 
-| Proveedor | Endpoint | Modelos |
+| Provider | Endpoint | Models |
 |---|---|---|
-| **MiniMax** (Token/Coding Plan) | API compatible Anthropic | MiniMax-M2.7 / M2.5 / M2.1 / M2 |
+| **MiniMax** (Token/Coding Plan) — *recommended* | Anthropic-compatible API | MiniMax-M2.7 / M2.5 / M2.1 / M2 |
 | **Claude** (Anthropic) | Messages API | Opus 4.8 / Sonnet 4.6 / **Haiku 4.5** |
 
-Configúralo en 🟢 → **Configurar IA**: elige proveedor, pulsa **"Abrir consola"**
-para sacar tu clave, pégala, elige modelo y **Prueba la conexión**. Solo se
-muestran los campos del proveedor activo. La clave se guarda en un archivo local
-protegido (`config.json`, permisos `600`).
+Because MiniMax exposes an Anthropic-compatible API, any other model that speaks
+that same API can be plugged in as well.
 
-> Sin clave, Flubber sigue funcionando con **frases enlatadas**.
+Set it up in 🟢 → **Configure AI**: pick a provider, click **"Open console"** to
+get your key, paste it, choose a model and **Test the connection**. Only the
+active provider's fields are shown. The key is saved in a protected local file
+(`config.json`, permissions `600`).
 
-### 💬 Chat integrado
+> Without a key, Flubber still works with **canned phrases**.
 
-El botón 💬 (o clic derecho → Hablar) abre un **panel de chat pixel sobre el
-slime**, no una ventana aparte:
+### 💬 Built-in chat
 
-- **Streaming real** (SSE): el texto aparece **token a token** mientras el modelo lo genera.
-- **Markdown renderizado** (negritas, itálicas, `código`, listas).
-- **Varias conversaciones**: ☰ lista, ＋ nueva, ✕ cerrar; se guardan en disco.
-- **Campo multilínea** con botón de enviar ➤ (crece con el texto). `Enter` envía, `Esc` cierra, rueda para scroll.
-- **Copiar** cualquier burbuja (botón ⧉ al pasar el mouse).
-- Mientras chateas, el slime **no deambula** ni mueve el diálogo.
+The 💬 button (or right-click → Talk) opens a **pixel chat panel over the slime**,
+not a separate window:
 
-### 🤖 Agente con herramientas
+- **Real streaming** (SSE): text appears **token by token** as the model generates it.
+- **Rendered Markdown** (bold, italics, `code`, lists).
+- **Multiple conversations**: ☰ list, ＋ new, ✕ close; saved to disk.
+- **Multiline field** with a send button ➤ (grows with the text). `Enter` sends, `Esc` closes, scroll wheel scrolls.
+- **Copy** any bubble (⧉ button on hover).
+- While you chat, the slime **doesn't wander** or move the dialog.
 
-Flubber decide solo cuándo usar sus herramientas (function calling):
+### 🤖 Agent with tools
 
-| Herramienta | Qué hace |
+Flubber decides on its own when to use its tools (function calling):
+
+| Tool | What it does |
 |---|---|
-| 🔎 `buscar_web` | Busca en internet (buscador nativo de MiniMax, o DuckDuckGo) |
-| 📄 `leer_pagina` | Descarga y resume una URL |
-| 🌡️ `clima` / 🕐 `fecha_hora` / ⏰ `recordatorio` | Utilidades |
-| 👁️ `ver_pantalla` | Toma una captura y la analiza ("¿qué hay en mi pantalla?"). Puede capturar **solo una app** ("¿qué ves en el navegador?") |
-| 🌐 `navegador_url` / `navegador_js` | Lee la pestaña activa y **ejecuta JavaScript** (leer, hacer clic, llenar formularios, navegar) en Safari/Chrome/Brave/Edge/Arc |
-| 🎨 `controlar_slime` | Bailar, rodar, color, crear skin por tema |
-| 🔗 `abrir` / 💻 `ejecutar_comando` | Abre apps/URLs y ejecuta comandos del sistema |
+| 🔎 `buscar_web` | Searches the internet (MiniMax's native search, or DuckDuckGo) |
+| 📄 `leer_pagina` | Downloads and summarizes a URL |
+| 🌡️ `clima` / 🕐 `fecha_hora` / ⏰ `recordatorio` | Utilities |
+| 👁️ `ver_pantalla` | Takes a screenshot and analyzes it ("what's on my screen?"). Can capture **just one app** ("what do you see in the browser?") |
+| 🌐 `navegador_url` / `navegador_js` | Reads the active tab and **runs JavaScript** (read, click, fill forms, navigate) in Safari/Chrome/Brave/Edge/Arc |
+| 🎨 `controlar_slime` | Dance, roll, color, create a skin by theme |
+| 🔗 `abrir` / 💻 `ejecutar_comando` | Opens apps/URLs and runs system commands |
 
-**Seguridad:** abrir cosas, ejecutar comandos y controlar el navegador **piden
-confirmación** mostrando la acción exacta, con opción **"Permitir siempre"**
-(menú → "Restablecer permisos" para revertir). Las búsquedas/lecturas corren directo.
+**Safety:** opening things, running commands and controlling the browser **ask
+for confirmation**, showing the exact action, with an **"Always allow"** option
+(menu → "Reset permissions" to revert). Searches/reads run directly.
 
-**Anti-alucinación:** temperatura baja + el prompt obliga a **verificar con
-herramientas** datos reales, citar fuentes y admitir cuando no sabe.
+**Anti-hallucination:** low temperature + the prompt forces it to **verify real
+facts with tools**, cite sources, and admit when it doesn't know.
 
-### 👁️ Visión y capturas
+### 👁️ Vision and captures
 
-- Captura **toda la pantalla** o **una app concreta**.
-- La ventana de Flubber **no aparece** en su propia captura ni en **grabaciones / compartir pantalla** (Meet, Chrome, QuickTime).
-- La captura se optimiza a **JPEG** antes de enviarla (más liviano).
-- La captura se muestra como **miniatura** en el chat (clic para abrir); puedes adjuntarla manualmente con 👁️ y quitarla con la ✕.
-
----
-
-## 🌐 Idiomas
-
-Sigue el idioma del sistema; cambia entre **Español / English** al vuelo desde el
-menú (afecta interfaz, prompts y respuestas).
-
-## 🔐 Permisos de macOS (una vez)
-
-- **Grabación de pantalla** → para `ver_pantalla` (Ajustes → Privacidad → Grabación de pantalla).
-- **Automatización** + **"Permitir JavaScript desde Apple Events"** en el navegador (Chrome: Ver → Desarrollador; Safari: Desarrollo) → para controlar el navegador.
-
-> Privacidad: al usar la IA, el texto, capturas o estado se envían al proveedor
-> (MiniMax/Anthropic). Los comandos se ejecutan en tu Mac solo tras tu aprobación.
+- Captures the **whole screen** or **a specific app**.
+- Flubber's window **does not appear** in its own capture, nor in **recordings / screen sharing** (Meet, Zoom, Chrome, QuickTime) — so it stays invisible to anyone watching your shared screen. See the note at the top: this is what makes it useful for **interviews** and other shared-screen calls.
+- The capture is optimized to **JPEG** before sending (lighter).
+- The capture is shown as a **thumbnail** in the chat (click to open); you can attach one manually with 👁️ and remove it with the ✕.
 
 ---
 
-## 🛠️ Personalizar
+## 🌐 Languages
 
-- **Balance del Tamagotchi** (tasas, umbrales, edades): `enum Tuning` en [`Sources/PetStats.swift`](Sources/PetStats.swift).
-- **Colores / aspecto:** `enum Pal` en [`Sources/main.swift`](Sources/main.swift).
-- **Personalidad / prompts / frases:** [`Sources/Personality.swift`](Sources/Personality.swift).
-- **Herramientas del agente:** [`Sources/Agent.swift`](Sources/Agent.swift).
-- **Probar rápido el ciclo de vida:** `open --env SLIMEPET_TIMESCALE=200 Flubber.app` (acelera el tiempo).
+It follows the system language; switch between **Spanish / English** on the fly
+from the menu (affects the interface, prompts and responses).
 
-## 📁 Archivos
+## 🔐 macOS permissions (one time)
+
+- **Screen Recording** → for `ver_pantalla` (Settings → Privacy → Screen Recording).
+- **Automation** + **"Allow JavaScript from Apple Events"** in the browser (Chrome: View → Developer; Safari: Develop) → to control the browser.
+
+> Privacy: when you use the AI, the text, captures or state are sent to the
+> provider (MiniMax/Anthropic). Commands run on your Mac only after your approval.
+
+---
+
+## 🛠️ Customize
+
+- **Tamagotchi balance** (rates, thresholds, ages): `enum Tuning` in [`Sources/PetStats.swift`](Sources/PetStats.swift).
+- **Colors / look:** `enum Pal` in [`Sources/main.swift`](Sources/main.swift).
+- **Personality / prompts / phrases:** [`Sources/Personality.swift`](Sources/Personality.swift).
+- **Agent tools:** [`Sources/Agent.swift`](Sources/Agent.swift).
+- **Quickly test the life cycle:** `open --env SLIMEPET_TIMESCALE=200 Flubber.app` (speeds up time).
+
+## 📁 Files
 
 ```
 Sources/
-  main.swift          # vista, render, HUD, chat, ventana, AppDelegate
-  PetStats.swift      # modelo Tamagotchi (necesidades, ciclo de vida, persistencia)
-  Personality.swift   # prompts y frases (bilingüe)
-  MiniMax.swift       # backends de IA (MiniMax/Claude), streaming SSE, config
-  Agent.swift         # bucle de agente + herramientas + captura de pantalla
-  Conversations.swift # almacén de conversaciones
-  Loc.swift           # idioma (ES/EN)
-build.sh              # compila y empaqueta Flubber.app
+  main.swift          # view, render, HUD, chat, window, AppDelegate
+  PetStats.swift      # Tamagotchi model (needs, life cycle, persistence)
+  Personality.swift   # prompts and phrases (bilingual)
+  MiniMax.swift       # AI backends (MiniMax/Claude), SSE streaming, config
+  Agent.swift         # agent loop + tools + screen capture
+  Conversations.swift # conversation store
+  Loc.swift           # language (ES/EN)
+build.sh              # compiles and packages Flubber.app
 ```
 
-Datos del usuario: `~/Library/Application Support/SlimePet/`
+User data: `~/Library/Application Support/SlimePet/`
 (`state.json`, `config.json`, `conversations.json`, `shots/`, `slimepet.log`).
 
 ## ⚙️ CI
 
-GitHub Actions compila la app en cada push y sube `Flubber.app.zip` como
-artefacto ([`.github/workflows/build.yml`](.github/workflows/build.yml)).
+GitHub Actions builds the app on every push and uploads `Flubber.app.zip` as an
+artifact ([`.github/workflows/build.yml`](.github/workflows/build.yml)).
 
 ---
 
-Hecho con 💚 por Cristian. Flubber te quiere. 🐸
+Made with 💚 by Cristian. Flubber loves you. 🐸
