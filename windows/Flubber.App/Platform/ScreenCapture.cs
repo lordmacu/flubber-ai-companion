@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Text;
 using Flubber.App.Interop;
 using Flubber.Core.Platform;
@@ -73,7 +74,7 @@ public static class ScreenCapture
         var codec = ImageCodecInfo.GetImageEncoders().FirstOrDefault(c => c.FormatID == ImageFormat.Jpeg.Guid);
         if (codec == null) return (null, null);
         using var ep = new EncoderParameters(1);
-        ep.Param[0] = new EncoderParameter(Encoder.Quality, 55L);
+        ep.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 55L);
         using var ms = new MemoryStream();
         resized.Save(ms, codec, ep);
         var bytes = ms.ToArray();
