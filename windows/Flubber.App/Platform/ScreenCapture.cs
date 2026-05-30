@@ -90,7 +90,7 @@ public static class ScreenCapture
 
         Native.EnumWindows((hWnd, _) =>
         {
-            if (!Native.IsWindowVisible(hWnd)) return true;
+            if (!Native.IsWindowVisible(hWnd) || Native.IsIconic(hWnd)) return true;   // saltar ocultas/minimizadas
             var len = Native.GetWindowTextLength(hWnd);
             if (len == 0) return true;
             var sb = new StringBuilder(len + 1);

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.WebSockets;
 using System.Text;
@@ -76,15 +77,15 @@ public static class BrowserCdp
             var buf = new byte[65536];
             for (var i = 0; i < 30; i++)
             {
-                var sb = new StringBuilder();
+                using var ms = new MemoryStream();
                 WebSocketReceiveResult r;
                 do
                 {
                     r = await sock.ReceiveAsync(new ArraySegment<byte>(buf), cts.Token).ConfigureAwait(false);
-                    sb.Append(Encoding.UTF8.GetString(buf, 0, r.Count));
+                    ms.Write(buf, 0, r.Count);
                 } while (!r.EndOfMessage);
 
-                var doc = JsonDocument.Parse(sb.ToString()).RootElement;
+                var doc = JsonDocument.Parse(Encoding.UTF8.GetString(ms.ToArray())).RootElement;
                 if (doc.TryGetProperty("id", out var idEl) && idEl.GetInt32() == 1)
                 {
                     try { await sock.CloseAsync(WebSocketCloseStatus.NormalClosure, "", cts.Token).ConfigureAwait(false); } catch { }

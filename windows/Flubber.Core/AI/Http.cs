@@ -61,6 +61,12 @@ internal static class Http
         using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonBody(body) };
         foreach (var (k, v) in headers) req.Headers.TryAddWithoutValidation(k, v);
         using var resp = await Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+            Log.Write($"STREAM HTTP {(int)resp.StatusCode} {err[..Math.Min(300, err.Length)]}");
+            throw new HttpRequestException($"stream HTTP {(int)resp.StatusCode}");
+        }
         await using var stream = await resp.Content.ReadAsStreamAsync(cts.Token).ConfigureAwait(false);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         string? line;

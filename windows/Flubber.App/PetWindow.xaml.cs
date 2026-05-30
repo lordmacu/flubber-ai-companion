@@ -52,6 +52,7 @@ public partial class PetWindow : Window, IPlatformBridge
     private double _vy;
     private int _wallSide;           // -1 izquierda, +1 derecha, 0 ninguno
     private int _nextWander = 240;
+    private long _lastDownTick;      // para detectar doble clic de forma fiable
 
     public PetWindow()
     {
@@ -255,7 +256,11 @@ public partial class PetWindow : Window, IPlatformBridge
     // ---------------------------------------------------------------- input
     private void OnLeftDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2) { DoPlay(); return; }
+        // doble clic por tiempo (ClickCount no es fiable porque DragMove abre un loop modal)
+        var now = Environment.TickCount64;
+        if (now - _lastDownTick < 300) { _lastDownTick = 0; DoPlay(); return; }
+        _lastDownTick = now;
+
         _dragging = true;
         try { DragMove(); } catch { }
         _dragging = false;

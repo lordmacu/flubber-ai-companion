@@ -50,6 +50,9 @@ internal static class Native
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr hWnd);   // minimizada
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
 
