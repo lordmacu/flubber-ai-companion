@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <video src="https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4" width="720" controls muted loop></video>
+  <img src="flubber.gif" alt="Flubber demo" width="600">
 </p>
 
-> ▶️ Demo. If the video doesn't play inline, [watch it here](https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4).
+> ▶️ [Watch the full-quality video](https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4).
 
 # 🟢 Flubber — AI slime pet for macOS
 
