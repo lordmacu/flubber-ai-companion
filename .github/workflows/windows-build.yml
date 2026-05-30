@@ -1,0 +1,24 @@
+name: Flubber Windows port
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: [ 'windows/**', '.github/workflows/windows-build.yml' ]
+  pull_request:
+    paths: [ 'windows/**' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Build Core (portable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore + build Flubber.Core
+        run: dotnet build windows/Flubber.Core/Flubber.Core.csproj -c Release
