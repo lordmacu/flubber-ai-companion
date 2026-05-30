@@ -25,6 +25,23 @@ public sealed class Agent
         _platform = platform;
     }
 
+    /// <summary>¿Ya hay turnos (aparte del system)?</summary>
+    public bool HasContext => _messages.Any(m => m.Role != "system");
+
+    /// <summary>Siembra turnos previos (de una conversación cargada) para dar memoria al LLM.</summary>
+    public void SeedHistory(IEnumerable<(string Role, string Content)> turns)
+    {
+        if (HasContext) return;
+        foreach (var (r, c) in turns)
+        {
+            if (string.IsNullOrEmpty(c)) continue;
+            _messages.Add(new AIMessage(r == "assistant" ? "assistant" : "user", c));
+        }
+    }
+
+    /// <summary>Vacía el contexto (para empezar una conversación nueva).</summary>
+    public void Reset() => _messages.Clear();
+
     // MARK: permisos
     private bool Allowed(string cat) => cat switch
     {
@@ -49,9 +66,10 @@ public sealed class Agent
     {
         _onStep = onStep;
         _onToken = onToken ?? (_ => { });
-        var sys = Personality.AgentSystem(_platform.Stats);
-        if (_messages.Count == 0) _messages.Add(new AIMessage("system", sys));
-        else _messages[0] = new AIMessage("system", sys);   // refresca estado
+        var sys = new AIMessage("system", Personality.AgentSystem(_platform.Stats));
+        // garantiza el prompt de sistema en el índice 0 sin pisar turnos sembrados
+        if (_messages.Count == 0 || _messages[0].Role != "system") _messages.Insert(0, sys);
+        else _messages[0] = sys;
         _messages.Add(new AIMessage { Role = "user", Content = userText, ImageBase64 = image });
 
         for (var iter = 1; iter <= MaxIterations; iter++)

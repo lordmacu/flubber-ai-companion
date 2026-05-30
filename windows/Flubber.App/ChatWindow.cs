@@ -12,7 +12,7 @@ public sealed class ChatWindow : Window
 {
     private readonly Agent _agent;
     private readonly ConversationStore _store;
-    private readonly Conversation _conv;
+    private Conversation _conv;
 
     private readonly Controls.StackPanel _messages = new() { Margin = new Thickness(10) };
     private readonly Controls.ScrollViewer _scroll;
@@ -58,14 +58,55 @@ public sealed class ChatWindow : Window
         bottom.Children.Add(_status);
         bottom.Children.Add(inputRow);
 
+        var topBar = new Controls.DockPanel { Margin = new Thickness(8, 6, 8, 0) };
+        var newBtn = new Controls.Button { Content = Loc.T("＋ Nueva", "＋ New"), Padding = new Thickness(8, 2, 8, 2) };
+        newBtn.Click += (_, _) => NewConversation();
+        Controls.DockPanel.SetDock(newBtn, Controls.Dock.Left);
+        topBar.Children.Add(newBtn);
+
         var root = new Controls.DockPanel();
         Controls.DockPanel.SetDock(bottom, Controls.Dock.Bottom);
+        Controls.DockPanel.SetDock(topBar, Controls.Dock.Top);
         root.Children.Add(bottom);
+        root.Children.Add(topBar);
         root.Children.Add(_scroll);
         Content = root;
 
         foreach (var m in _conv.Messages) AddBubble(m.Role, m.Content);
+        _agent.SeedHistory(_conv.Messages.Select(m => (m.Role, m.Content)));   // memoria del LLM
         Loaded += (_, _) => _input.Focus();
+    }
+
+    /// <summary>Muestra el thumbnail de una captura adjuntada por la herramienta ver_pantalla.</summary>
+    public void AddImage(string path)
+    {
+        try
+        {
+            var bmp = new Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.UriSource = new Uri(path);
+            bmp.EndInit();
+            var img = new Controls.Image
+            {
+                Source = bmp, MaxWidth = 240, Margin = new Thickness(0, 4, 0, 4),
+                HorizontalAlignment = WpfAlign.Left, Stretch = Media.Stretch.Uniform,
+            };
+            _messages.Children.Add(img);
+            _scroll.ScrollToEnd();
+        }
+        catch { /* ignore */ }
+    }
+
+    private void NewConversation()
+    {
+        _conv = Conversation.New();
+        _store.Conversations.Add(_conv);
+        _store.Save();
+        _messages.Children.Clear();
+        _agent.Reset();
+        _status.Text = "";
+        _input.Focus();
     }
 
     private Controls.TextBlock AddBubble(string role, string text)

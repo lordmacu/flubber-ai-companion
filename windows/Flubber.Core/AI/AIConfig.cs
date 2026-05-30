@@ -68,6 +68,16 @@ public sealed class AIConfig
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
+    // Hooks de cifrado de secretos (los rellena la capa de Windows con DPAPI).
+    // Si quedan en null (p.ej. en CI/no-Windows), las claves se guardan en texto plano.
+    public static Func<string, string>? ProtectFn;
+    public static Func<string, string>? UnprotectFn;
+
+    private static string Enc(string s) => string.IsNullOrEmpty(s) ? s : (ProtectFn?.Invoke(s) ?? s);
+    private static string? EncN(string? s) => string.IsNullOrEmpty(s) ? s : (ProtectFn?.Invoke(s!) ?? s);
+    private static string Dec(string s) => string.IsNullOrEmpty(s) ? s : (UnprotectFn?.Invoke(s) ?? s);
+    private static string? DecN(string? s) => string.IsNullOrEmpty(s) ? s : (UnprotectFn?.Invoke(s!) ?? s);
+
     public static AIConfig Load()
     {
         try
@@ -76,7 +86,15 @@ public sealed class AIConfig
             {
                 var json = System.IO.File.ReadAllText(Paths.ConfigJson);
                 var c = JsonSerializer.Deserialize<AIConfig>(json);
-                if (c != null) return c;
+                if (c != null)
+                {
+                    // descifra las claves (UnprotectFn devuelve el texto plano si ya lo era — migración)
+                    c.ApiKey = Dec(c.ApiKey);
+                    c.ClaudeKey = DecN(c.ClaudeKey);
+                    c.OpenaiKey = DecN(c.OpenaiKey);
+                    c.DeepseekKey = DecN(c.DeepseekKey);
+                    return c;
+                }
             }
         }
         catch { /* ignore */ }
@@ -85,7 +103,16 @@ public sealed class AIConfig
 
     public void Save()
     {
-        try { System.IO.File.WriteAllText(Paths.ConfigJson, JsonSerializer.Serialize(this, JsonOpts)); }
+        try
+        {
+            // cifra las claves en una copia antes de escribir (la instancia en memoria queda en claro)
+            var clone = (AIConfig)MemberwiseClone();
+            clone.ApiKey = Enc(ApiKey);
+            clone.ClaudeKey = EncN(ClaudeKey);
+            clone.OpenaiKey = EncN(OpenaiKey);
+            clone.DeepseekKey = EncN(DeepseekKey);
+            System.IO.File.WriteAllText(Paths.ConfigJson, JsonSerializer.Serialize(clone, JsonOpts));
+        }
         catch { /* ignore */ }
     }
 }

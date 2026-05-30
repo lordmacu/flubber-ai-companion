@@ -148,15 +148,22 @@ public partial class PetWindow : Window, IPlatformBridge
         Surface.InvalidateVisual();
     }
 
+    /// <summary>Límites de roaming: horizontal en toda la pantalla virtual (multi-monitor); suelo en el área de trabajo.</summary>
+    private (double Left, double Right, double Ground) Bounds()
+    {
+        var wa = SystemParameters.WorkArea;
+        var left = SystemParameters.VirtualScreenLeft;
+        var right = SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - Width;
+        if (right < left) right = left;
+        return (left, right, wa.Bottom - Height);
+    }
+
     /// <summary>Mueve la ventana: pasear/rodar, caída con gravedad y escurrirse por la pared.</summary>
     private void UpdateMovement()
     {
         if (_dragging) return;
 
-        var wa = SystemParameters.WorkArea;
-        var ground = wa.Bottom - Height;
-        var leftBound = wa.Left;
-        var rightBound = wa.Right - Width;
+        var (leftBound, rightBound, ground) = Bounds();
 
         if (_stats.IsDead || _stats.Stage == LifeStage.Egg || _stats.IsAsleep)
         { _walking = _rolling = _falling = false; _wallSide = 0; return; }
@@ -266,10 +273,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _dragging = false;
 
         // al soltar: clamp dentro de la pantalla y decidir física
-        var wa = SystemParameters.WorkArea;
-        var ground = wa.Bottom - Height;
-        var leftBound = wa.Left;
-        var rightBound = wa.Right - Width;
+        var (leftBound, rightBound, ground) = Bounds();
         Left = Math.Clamp(Left, leftBound, rightBound);
         _walking = _rolling = false;
         if (Left <= leftBound + 2) _wallSide = -1;
@@ -279,9 +283,7 @@ public partial class PetWindow : Window, IPlatformBridge
 
     private void StartWalk(bool roll = false)
     {
-        var wa = SystemParameters.WorkArea;
-        var leftBound = wa.Left;
-        var rightBound = wa.Right - Width;
+        var (leftBound, rightBound, _) = Bounds();
         if (rightBound <= leftBound) return;
         _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound);
         _walking = !roll; _rolling = roll; _wallSide = 0; _falling = false;
@@ -421,7 +423,7 @@ public partial class PetWindow : Window, IPlatformBridge
     public Task<(string? Base64, string? Path)> CaptureScreenAsync(string? appHint)
         => Flubber.App.Platform.ScreenCapture.CaptureAsync(appHint);
 
-    public void AttachShot(string path) { /* Fase 8: thumbnail en el chat */ }
+    public void AttachShot(string path) => Dispatcher.Invoke(() => _chat?.AddImage(path));
 
     public string ControlSlime(string accion, string tema) => Dispatcher.Invoke(() =>
     {

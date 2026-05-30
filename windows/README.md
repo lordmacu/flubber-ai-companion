@@ -27,8 +27,11 @@ windows/
 - [x] Real screen capture (GDI BitBlt — full screen or a specific app/window) feeding the AI vision tool.
 - [x] Browser control via **Chrome DevTools Protocol** (`navegador_url` / `navegador_js`) — needs the browser started with `--remote-debugging-port=9222`.
 - [x] AI-settings window (provider / key / model / test connection) + streaming chat window with persistence.
-- [x] Package the `.exe` (win-x64, self-contained) as a CI artifact (`Flubber-windows`).
-- [ ] Polish: hover HUD of care buttons + extra animations (walk across screen, roll, wall-slide).
+- [x] Package the `.exe` (win-x64, self-contained) + **Inno Setup installer** (install/repair/uninstall, shortcuts, optional autostart) — both built in CI.
+- [x] Slime icon embedded in the `.exe`, installer and system tray.
+- [x] Polish: hover HUD of care buttons + walk/wander, roll, fall and wall-slide physics (multi-monitor aware).
+- [x] **API keys encrypted at rest with DPAPI** (`CurrentUser` scope) — replaces macOS Keychain; plaintext configs auto-migrate.
+- [x] Streaming chat: persisted conversations, **LLM memory restored across restarts**, capture thumbnails, "＋ New conversation".
 
 **Functional parity with macOS reached.** The platform-specific tools are abstracted behind
 `Agent/IPlatformBridge.cs`, implemented by the WPF app (`PetWindow.xaml.cs`). Both projects compile in
