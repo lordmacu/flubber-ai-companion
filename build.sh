@@ -32,6 +32,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSMinimumSystemVersion</key>  <string>12.0</string>
     <key>LSUIElement</key>             <true/>
     <key>NSHighResolutionCapable</key> <true/>
+    <key>NSSpeechRecognitionUsageDescription</key> <string>Flubber transcribe el audio de tu reunión en el dispositivo para poder resumirla.</string>
     <key>NSAppSleepDisabled</key>      <true/>
 </dict>
 </plist>

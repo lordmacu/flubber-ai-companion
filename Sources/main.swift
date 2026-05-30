@@ -158,6 +158,8 @@ final class PetView: NSView {
     var lastSpontaneous = Date.distantPast
     var lastClickTalk = Date.distantPast
     var onChatRequested: (() -> Void)?
+    var onToggleListen: (() -> Void)?
+    var listening = false                 // escuchando la reunión (para el indicador 👂)
 
     // chat integrado (panel pixel sobre el slime)
     var chatActive = false
@@ -1313,7 +1315,7 @@ final class PetView: NSView {
                  color: NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1))
         let bs: CGFloat = 20, gapb: CGFloat = 4
         var bxr = header.maxX - 8 - bs
-        for (id, icon) in [("close", "✕"), ("new", "＋"), ("list", "☰"), ("eye", "👁️")] {
+        for (id, icon) in [("close", "✕"), ("new", "＋"), ("list", "☰"), ("eye", "👁️"), ("ear", listening ? "⏹️" : "👂")] {
             let r = NSRect(x: bxr, y: header.minY + 4, width: bs, height: bs)
             let p = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
             NSColor(white: 1, alpha: 0.12).setFill(); p.fill()
@@ -1557,6 +1559,7 @@ final class PetView: NSView {
             case "new": newConversation()
             case "list": listOpen.toggle(); needsDisplay = true
             case "eye": captureScreen()
+            case "ear": onToggleListen?()
             default: break
             }
             return true
@@ -1842,6 +1845,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.applyCapturePrivacy(cfg.hideFromCaptureValue)   // oculto por defecto
         if let spec = cfg.customSkin, let skin = Pal.skin(from: spec) { Pal.setAISkin(skin) }
         view.onChatRequested = { [weak self] in self?.openChat() }
+        view.onToggleListen = { [weak self] in self?.toggleListen() }
 
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
@@ -1929,6 +1933,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: Loc.t("Dormir / Despertar 💤", "Sleep / Wake 💤"), action: #selector(mSleep), keyEquivalent: "s"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: Loc.t("Hablar con \(view.stats.displayName)… 💬", "Chat with \(view.stats.displayName)… 💬"), action: #selector(openChat), keyEquivalent: "t"))
+        if #available(macOS 13.0, *) {
+            let l = MeetingListener.shared
+            let title = l.isListening
+                ? Loc.t("Dejar de escuchar la reunión ⏹️", "Stop listening to meeting ⏹️")
+                : Loc.t("Escuchar la reunión 🎧", "Listen to meeting 🎧")
+            menu.addItem(NSMenuItem(title: title, action: #selector(toggleListen), keyEquivalent: ""))
+            if !l.fullText.isEmpty {
+                menu.addItem(NSMenuItem(title: Loc.t("Resumir la reunión 📝", "Summarize meeting 📝"), action: #selector(summarizeMeeting), keyEquivalent: ""))
+            }
+        }
         menu.addItem(NSMenuItem(title: Loc.t("Crear skin con IA… 🎨✨", "Create AI skin… 🎨✨"), action: #selector(makeSkin), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: Loc.t("Configurar IA… ⚙️", "AI settings… ⚙️"), action: #selector(showConfig), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: Loc.t("Restablecer permisos 🔒", "Reset permissions 🔒"), action: #selector(resetPerms), keyEquivalent: ""))
@@ -2012,6 +2026,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openChat() {
         if view.client?.config.isConfigured != true { showNeedConfig(); return }
         view.toggleChat()
+    }
+
+    // --- Escuchar reunión (audio del sistema → transcripción on-device) ---
+    @objc func toggleListen() {
+        guard #available(macOS 13.0, *) else {
+            notify("Flubber", Loc.t("La escucha requiere macOS 13+.", "Listening requires macOS 13+.")); return
+        }
+        let l = MeetingListener.shared
+        if l.isListening {
+            l.stop()
+            view.listening = false
+            view.say(Loc.t("Dejé de escuchar 👂", "Stopped listening 👂"))
+            rebuildMenu()
+        } else {
+            l.start { [weak self] ok, err in
+                DispatchQueue.main.async {
+                    if ok {
+                        self?.view.listening = true
+                        self?.view.say(Loc.t("Escuchando la reunión… 🎧", "Listening to the meeting… 🎧"))
+                    } else {
+                        self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))
+                    }
+                    self?.rebuildMenu()
+                }
+            }
+        }
+    }
+
+    @objc func summarizeMeeting() {
+        guard #available(macOS 13.0, *) else { return }
+        let text = MeetingListener.shared.fullText
+        guard !text.isEmpty else { notify("Flubber", Loc.t("Aún no hay nada transcrito.", "Nothing transcribed yet.")); return }
+        guard let client = view.client, client.isConfigured else { showNeedConfig(); return }
+        view.say(Loc.t("Resumiendo… 📝", "Summarizing… 📝"))
+        let sys = Loc.t("Eres un asistente que resume reuniones. Devuelve: 1) resumen breve, 2) puntos clave, 3) tareas/acuerdos. Solo en español.",
+                        "You summarize meetings. Return: 1) short summary, 2) key points, 3) action items. English only.")
+        let prompt = Loc.t("Transcripción (audio del sistema, puede tener errores):\n\n",
+                           "Transcript (system audio, may contain errors):\n\n") + text
+        client.chat(system: sys, history: [], user: prompt, maxTokens: 1200) { [weak self] reply in
+            DispatchQueue.main.async {
+                let s = reply.map { Agent.cleanFinal($0) } ?? ""
+                self?.showSummary(s.isEmpty ? Loc.t("No pude generar el resumen.", "Couldn't generate the summary.") : s)
+            }
+        }
+    }
+
+    private func showSummary(_ text: String) {
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = Loc.t("Resumen de la reunión", "Meeting summary")
+        a.informativeText = text
+        a.addButton(withTitle: Loc.t("Copiar", "Copy"))
+        a.addButton(withTitle: "OK")
+        if a.runModal() == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
     }
 
     // --- IA: crear skin ---

@@ -118,6 +118,31 @@ final class Agent {
                  { completion(Loc.t("El usuario rechazó la acción.", "User rejected the action.")) })
         case "abrir":        self.confirmOpen(args, completion)
         case "ejecutar_comando": self.confirmRun(args, completion)
+        case "escuchar_reunion":
+            if #available(macOS 13.0, *) {
+                let l = MeetingListener.shared
+                if l.isListening { completion(Loc.t("Ya estoy escuchando 🎧", "Already listening 🎧")); return }
+                l.start { ok, err in
+                    DispatchQueue.main.async {
+                        self.view?.listening = ok
+                        completion(ok ? Loc.t("Empecé a escuchar la reunión 🎧", "Started listening to the meeting 🎧")
+                                      : (err ?? Loc.t("No pude escuchar.", "Couldn't listen.")))
+                    }
+                }
+            } else { completion(Loc.t("La escucha requiere macOS 13+.", "Listening requires macOS 13+.")) }
+        case "detener_escucha":
+            if #available(macOS 13.0, *) {
+                MeetingListener.shared.stop()
+                DispatchQueue.main.async { self.view?.listening = false }
+                completion(Loc.t("Dejé de escuchar 👂", "Stopped listening 👂"))
+            } else { completion("ok") }
+        case "resumen_reunion":
+            if #available(macOS 13.0, *) {
+                let t = MeetingListener.shared.fullText
+                completion(t.isEmpty
+                    ? Loc.t("No hay nada transcrito aún. Activa la escucha primero.", "Nothing transcribed yet. Start listening first.")
+                    : Loc.t("Transcripción de la reunión:\n", "Meeting transcript:\n") + t)
+            } else { completion("") }
         default: completion("Herramienta desconocida.")
         }
     }
@@ -242,6 +267,9 @@ final class Agent {
         case "navegador_js":  return Loc.t("🌐 controlando el navegador", "🌐 controlling the browser")
         case "abrir":        return Loc.t("🔗 quiere abrir ", "🔗 wants to open ") + (a["objetivo"] as? String ?? a["url"] as? String ?? "")
         case "ejecutar_comando": return Loc.t("💻 quiere ejecutar un comando", "💻 wants to run a command")
+        case "escuchar_reunion": return Loc.t("🎧 escuchando la reunión", "🎧 listening to the meeting")
+        case "detener_escucha":  return Loc.t("⏹️ dejando de escuchar", "⏹️ stopping listening")
+        case "resumen_reunion":  return Loc.t("📝 resumiendo la reunión", "📝 summarizing the meeting")
         default: return "🔧 \(c.name)"
         }
     }
@@ -277,6 +305,9 @@ final class Agent {
            ["objetivo": ["type": "string", "description": "URL o nombre de app"]], ["objetivo"]),
         fn("ejecutar_comando", "Ejecuta un comando de shell en el Mac (pide confirmación al usuario).",
            ["comando": ["type": "string", "description": "comando zsh"]], ["comando"]),
+        fn("escuchar_reunion", "Empieza a escuchar el audio del sistema (la reunión de Meet/Teams/Zoom) y a transcribirlo EN EL DISPOSITIVO. Úsala cuando el usuario diga 'escucha la conversación/la reunión'.", [:], []),
+        fn("detener_escucha", "Deja de escuchar la reunión.", [:], []),
+        fn("resumen_reunion", "Devuelve la transcripción acumulada de la reunión para que la resumas. Úsala cuando pidan un resumen de lo que se ha hablado.", [:], []),
     ]
 }
 
