@@ -1,6 +1,9 @@
 # Build output
 *.app/
 *.app.zip
+*.dmg
+dmg-stage/
+dmg/background.png        # se regenera con dmg/make-bg.swift
 build/
 .DS_Store
 

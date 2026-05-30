@@ -8,7 +8,9 @@ it in a built-in chat.
 
 [![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) [![Download](https://img.shields.io/github/v/release/lordmacu/flubber-ai-companion?label=download&color=brightgreen)](https://github.com/lordmacu/flubber-ai-companion/releases/latest) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
 
-### ⬇️ [**Download Flubber.app**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) &nbsp;·&nbsp; [all releases](https://github.com/lordmacu/flubber-ai-companion/releases)
+### ⬇️ [**Download Flubber.dmg**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg) &nbsp;·&nbsp; [.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) &nbsp;·&nbsp; [all releases](https://github.com/lordmacu/flubber-ai-companion/releases)
+
+> Open the `.dmg` and **drag Flubber into Applications**. First launch: right-click → **Open** (ad-hoc signed).
 
 > 🕵️ **Invisible on screen captures & screen shares.** Flubber's window does
 > **not** appear in screenshots, screen recordings, or screen sharing — Google
