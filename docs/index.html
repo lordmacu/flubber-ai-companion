@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flubber — AI slime desktop pet for macOS &amp; Windows</title>
+<meta name="description" content="Flubber is a pixel-art AI slime desktop pet for macOS and Windows: a real-time Tamagotchi plus an AI agent that sees your screen, controls your browser and chats — and stays invisible in screenshots and screen shares." />
+<link rel="icon" type="image/png" href="icon.png" />
+<meta property="og:title" content="Flubber — AI slime desktop pet" />
+<meta property="og:description" content="A real-time Tamagotchi + AI agent that sees your screen and stays invisible in screen shares. macOS & Windows." />
+<meta property="og:image" content="https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/icon.png" />
+<meta property="og:type" content="website" />
+<style>
+  :root{
+    --green:#3FC97C; --green-dark:#239256; --green-light:#E9F9F0;
+    --ink:#10231a; --muted:#5b6b62; --bg:#ffffff; --card:#f6faf7; --line:#e3ece7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--green-dark);text-decoration:none}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;
+    padding:13px 22px;border-radius:999px;border:1.5px solid transparent;cursor:pointer;transition:.15s;
+  }
+  .btn-primary{background:var(--green);color:#06120b;box-shadow:0 6px 18px rgba(63,201,124,.35)}
+  .btn-primary:hover{background:var(--green-dark);color:#fff;transform:translateY(-1px)}
+  .btn-ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{border-color:var(--green);color:var(--green-dark)}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+  .brand img{width:30px;height:30px;border-radius:7px}
+  .nav-links{display:flex;align-items:center;gap:22px;font-weight:600;font-size:14px;color:var(--muted)}
+  .nav-links a:hover{color:var(--ink)}
+  @media(max-width:680px){.nav-links a:not(.gh){display:none}}
+
+  /* hero */
+  .hero{text-align:center;padding:64px 0 36px;background:radial-gradient(900px 380px at 50% -60px,var(--green-light),#fff 70%)}
+  .hero img.logo{width:128px;height:128px;border-radius:28px;box-shadow:0 16px 40px rgba(35,146,86,.22)}
+  .hero h1{font-size:clamp(34px,6vw,58px);line-height:1.05;letter-spacing:-.02em;margin:22px 0 10px;font-weight:850}
+  .hero h1 .g{color:var(--green-dark)}
+  .hero p.sub{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:680px;margin:0 auto 26px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .os{font-size:12.5px;color:var(--muted);margin-top:14px}
+
+  /* stealth callout */
+  .stealth{margin:30px auto 0;max-width:760px;background:#0e1f16;color:#dff5e9;border-radius:18px;padding:22px 24px;text-align:left;display:flex;gap:16px;align-items:flex-start}
+  .stealth .ico{font-size:26px;line-height:1}
+  .stealth b{color:#fff}
+
+  /* demo */
+  .demo{padding:46px 0 10px;text-align:center}
+  .demo img{max-width:680px;width:100%;border-radius:16px;border:1px solid var(--line);box-shadow:0 18px 50px rgba(16,35,26,.12)}
+
+  /* sections */
+  section.block{padding:56px 0}
+  h2{font-size:clamp(26px,4vw,36px);letter-spacing:-.02em;text-align:center;margin-bottom:10px;font-weight:820}
+  .lead{text-align:center;color:var(--muted);max-width:620px;margin:0 auto 38px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card .e{font-size:26px}
+  .card h3{font-size:17px;margin:10px 0 6px}
+  .card p{font-size:14.5px;color:var(--muted)}
+
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
+  @media(max-width:680px){.shots{grid-template-columns:1fr}}
+  .shots img{width:100%;border-radius:14px;border:1px solid var(--line);box-shadow:0 12px 30px rgba(16,35,26,.10)}
+
+  .providers{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .pill{background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:600;font-size:14px}
+  .pill b{color:var(--green-dark)}
+
+  /* download band */
+  .band{background:linear-gradient(135deg,var(--green),#2bb56c);color:#06120b;border-radius:24px;padding:46px 28px;text-align:center;margin:10px 0}
+  .band h2{color:#06120b}
+  .band .cta .btn-ghost{background:rgba(255,255,255,.92);border-color:transparent}
+
+  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px;text-align:center}
+  footer a{font-weight:600}
+  .note{font-size:12.5px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><img src="icon.png" alt="Flubber" /> Flubber</div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a class="gh" href="https://github.com/lordmacu/flubber-ai-companion">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="logo" src="icon.png" alt="Flubber slime icon" />
+    <h1>Meet <span class="g">Flubber</span> 🟢</h1>
+    <p class="sub">A pixel-art AI slime desktop pet for <b>macOS</b> &amp; <b>Windows</b>. A real-time Tamagotchi <i>and</i> an AI agent that sees your screen, controls your browser and chats with you.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg">🍎 Download for macOS</a>
+      <a class="btn btn-primary" href="https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber-Setup.exe">🪟 Download for Windows</a>
+    </div>
+    <div class="os">macOS 12+ · Windows 10/11 · free &amp; open source</div>
+
+    <div class="stealth">
+      <div class="ico">🕵️</div>
+      <div>Flubber is <b>invisible in screenshots, screen recordings and screen shares</b> (Google Meet, Zoom, QuickTime…). Only you see it on your own display — handy when you need to quietly use an AI during a call.</div>
+    </div>
+  </div>
+</header>
+
+<div class="demo wrap">
+  <img src="flubber.gif" alt="Flubber demo" />
+</div>
+
+<section class="block" id="features">
+  <div class="wrap">
+    <h2>Not just a pet</h2>
+    <p class="lead">Everything is drawn in code (no image files) — and it actually does things.</p>
+    <div class="grid">
+      <div class="card"><div class="e">🐹</div><h3>Real Tamagotchi</h3><p>Hunger, energy, happiness, cleanliness and health decay in real time — even when closed. It grows from egg to adult, can get sick, and needs care.</p></div>
+      <div class="card"><div class="e">🧠</div><h3>AI agent</h3><p>Chat with it in a built-in panel with real token-by-token streaming. It uses tools: web search, read pages, weather, reminders and more.</p></div>
+      <div class="card"><div class="e">👁️</div><h3>Sees your screen</h3><p>Ask “what's on my screen?” and it captures and analyzes it — the whole desktop or just one app.</p></div>
+      <div class="card"><div class="e">🌐</div><h3>Controls your browser</h3><p>Reads the active tab and runs JavaScript to extract text, click, fill forms or navigate (Chrome / Edge / Brave / Safari).</p></div>
+      <div class="card"><div class="e">🕵️</div><h3>Invisible on capture</h3><p>Excluded from screenshots and screen sharing by default, with a one-click toggle. Your recordings stay clean.</p></div>
+      <div class="card"><div class="e">🎨</div><h3>Pixel-art &amp; skins</h3><p>Walks, blinks, dances, follows your cursor. Change its color or ask the AI to design a skin by theme (“lava”, “galaxy”).</p></div>
+    </div>
+
+    <div style="text-align:center;margin-top:34px">
+      <p class="lead" style="margin-bottom:14px">Works with four AI providers — designed primarily for MiniMax:</p>
+      <div class="providers">
+        <span class="pill"><b>MiniMax</b> · recommended</span>
+        <span class="pill">Claude</span>
+        <span class="pill">ChatGPT</span>
+        <span class="pill">DeepSeek</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="background:var(--green-light)">
+  <div class="wrap">
+    <div class="shots">
+      <img src="menu.png" alt="Flubber right-click menu and speech bubble" />
+      <img src="chat.png" alt="Flubber built-in chat panel" />
+    </div>
+  </div>
+</section>
+
+<section class="block" id="download">
+  <div class="wrap">
+    <div class="band">
+      <h2>Bring Flubber home 💚</h2>
+      <p style="max-width:560px;margin:8px auto 22px">Free, open source, and built 100% in native code — Swift/AppKit on macOS, C#/.NET (WPF) on Windows.</p>
+      <div class="cta">
+        <a class="btn btn-ghost" href="https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg">🍎 macOS (.dmg)</a>
+        <a class="btn btn-ghost" href="https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber-Setup.exe">🪟 Windows (installer)</a>
+        <a class="btn btn-ghost" href="https://github.com/lordmacu/flubber-ai-companion/releases/latest">All releases ↗</a>
+      </div>
+      <div class="note">First launch is unsigned — macOS: right-click → Open · Windows: SmartScreen → More info → Run anyway.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Made with 💚 by Cristian · <a href="https://github.com/lordmacu/flubber-ai-companion">Source on GitHub</a> · Flubber loves you. 🐸
+  </div>
+</footer>
+
+</body>
+</html>
