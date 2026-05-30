@@ -18,9 +18,14 @@ it in a built-in chat.
 
 [![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) [![Download](https://img.shields.io/github/v/release/lordmacu/flubber-ai-companion?label=download&color=brightgreen)](https://github.com/lordmacu/flubber-ai-companion/releases/latest) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
 
-### ⬇️ [**Download Flubber.dmg**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg) &nbsp;·&nbsp; [.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) &nbsp;·&nbsp; [all releases](https://github.com/lordmacu/flubber-ai-companion/releases)
+### ⬇️ Download
 
-> 🪟 **Windows?** A C# / .NET 8 (WPF) port with functional parity lives in [`windows/`](windows/) — same Tamagotchi, AI agent, capture-stealth and 4 providers. Grab the build from [Actions → Artifacts](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/windows-build.yml).
+| Platform | Download |
+|---|---|
+| 🍎 **macOS** 12+ | [**Flubber.dmg**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg) &nbsp;·&nbsp; [.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) |
+| 🪟 **Windows** 10/11 | [**Flubber-Setup.exe**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber-Setup.exe) (installer) &nbsp;·&nbsp; [portable .zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber-win-x64.zip) |
+
+[all releases](https://github.com/lordmacu/flubber-ai-companion/releases) · the Windows app is a C# / .NET 8 (WPF) port with functional parity (same Tamagotchi, AI agent, capture-stealth, 4 providers) — see [`windows/`](windows/).
 
 > Open the `.dmg` and **drag Flubber into Applications**. First launch: right-click → **Open** (ad-hoc signed).
 

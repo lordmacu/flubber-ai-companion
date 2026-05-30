@@ -14,6 +14,9 @@
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
+#ifndef IcoPath
+  #define IcoPath "..\Flubber.App\Flubber.ico"
+#endif
 
 #define AppName "Flubber"
 #define AppExe "Flubber.exe"
@@ -32,6 +35,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExe}
+SetupIconFile={#IcoPath}
 ; Instalación por-usuario (sin admin): evita UAC y SmartScreen de instalador sin firmar.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog

@@ -11,6 +11,7 @@
     <RootNamespace>Flubber.App</RootNamespace>
     <AssemblyName>Flubber</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Flubber.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
