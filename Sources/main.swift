@@ -2227,10 +2227,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(hideItem)
         menu.addItem(NSMenuItem(title: Loc.t("Idioma: English 🌐", "Language: Español 🌐"), action: #selector(toggleLang), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: Loc.t("¡Pasea!", "Walk!"), action: #selector(walkNow), keyEquivalent: "w"))
-        menu.addItem(NSMenuItem(title: Loc.t("Persíguelo", "Chase cursor"), action: #selector(chaseNow), keyEquivalent: "c"))
-        menu.addItem(NSMenuItem(title: Loc.t("¡Baila! 💃", "Dance! 💃"), action: #selector(danceNow), keyEquivalent: "d"))
-        menu.addItem(NSMenuItem(title: Loc.t("¡Rueda! 🤸", "Roll! 🤸"), action: #selector(rollNow), keyEquivalent: "r"))
+        // Submenú con todas las animaciones
+        let animItem = NSMenuItem(title: Loc.t("Animaciones 🎭", "Animations 🎭"), action: nil, keyEquivalent: "")
+        let animMenu = NSMenu()
+        let anims: [(String, String, Selector, String)] = [
+            ("¡Pasea! 🚶", "Walk! 🚶", #selector(walkNow), "w"),
+            ("Persíguelo 🏃", "Chase cursor 🏃", #selector(chaseNow), "c"),
+            ("¡Baila! 💃", "Dance! 💃", #selector(danceNow), "d"),
+            ("¡Rueda! 🤸", "Roll! 🤸", #selector(rollNow), "r"),
+            ("¡Salta! ⤴️", "Jump! ⤴️", #selector(jumpNow), ""),
+            ("Contonéate 🪩", "Wiggle 🪩", #selector(wiggleNow), ""),
+            ("Estírate 🙆", "Stretch 🙆", #selector(stretchNow), ""),
+            ("Maréate 😵‍💫", "Spin 😵‍💫", #selector(spinNow), ""),
+            ("Bosteza 🥱", "Yawn 🥱", #selector(yawnNow), ""),
+        ]
+        for (es, en, sel, key) in anims {
+            let it = NSMenuItem(title: Loc.t(es, en), action: sel, keyEquivalent: key)
+            it.target = self; animMenu.addItem(it)
+        }
+        animItem.submenu = animMenu
+        menu.addItem(animItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: Loc.t("Ponerle nombre 🏷️", "Set name 🏷️"), action: #selector(setNameDialog), keyEquivalent: "n"))
         menu.addItem(NSMenuItem(title: Loc.t("Cambiar color 🎨", "Change color 🎨"), action: #selector(cycleColor), keyEquivalent: "k"))
@@ -2263,6 +2279,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func chaseNow() { view.enter(.chasing) }
     @objc func danceNow() { view.enter(.dancing) }
     @objc func rollNow()  { view.enter(.rolling) }
+    @objc func jumpNow()    { view.wakeUp(); view.enter(.happy) }
+    @objc func wiggleNow()  { view.wakeUp(); view.enter(.wiggling) }
+    @objc func stretchNow() { view.wakeUp(); view.enter(.stretching) }
+    @objc func spinNow()    { view.wakeUp(); view.enter(.dizzy) }
+    @objc func yawnNow()    { view.enter(.yawning) }
     @objc func cycleColor() { Pal.index = (Pal.index + 1) % Pal.skins.count; view.stats.skinIndex = Pal.index }
     @objc func restart() { view.doRestart() }
     @objc func toggleLaunchAtLogin() {

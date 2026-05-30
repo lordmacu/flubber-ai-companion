@@ -397,7 +397,14 @@ public partial class PetWindow : Window, IPlatformBridge
             ? Loc.T("Dejar de escuchar la reunión ⏹️", "Stop listening to meeting ⏹️")
             : Loc.T("Escuchar reunión 👂", "Listen to meeting 👂"), null, (_, _) => ToggleListen());
         m.Items.Add(Loc.T("Configurar IA… ⚙️", "AI settings… ⚙️"), null, (_, _) => OpenSettings());
-        m.Items.Add(Loc.T("¡Pasea! 🚶", "Walk! 🚶"), null, (_, _) => StartWalk());
+        var anim = new Forms.ToolStripMenuItem(Loc.T("Animaciones 🎭", "Animations 🎭"));
+        anim.DropDownItems.Add(Loc.T("¡Pasea! 🚶", "Walk! 🚶"), null, (_, _) => StartWalk());
+        anim.DropDownItems.Add(Loc.T("¡Baila! 💃", "Dance! 💃"), null, (_, _) => SetTransient(SlimeState.Dancing, 120));
+        anim.DropDownItems.Add(Loc.T("¡Rueda! 🤸", "Roll! 🤸"), null, (_, _) => StartWalk(roll: true));
+        anim.DropDownItems.Add(Loc.T("¡Salta! ⤴️", "Jump! ⤴️"), null, (_, _) => SetTransient(SlimeState.Happy, 40));
+        anim.DropDownItems.Add(Loc.T("Contonéate 🪩", "Wiggle 🪩"), null, (_, _) => SetTransient(SlimeState.Wiggling, 38));
+        anim.DropDownItems.Add(Loc.T("Estírate 🙆", "Stretch 🙆"), null, (_, _) => SetTransient(SlimeState.Stretching, 42));
+        m.Items.Add(anim);
         m.Items.Add(Loc.T("Cambiar color 🎨", "Change color 🎨"), null, (_, _) => CycleColor());
 
         var hide = new Forms.ToolStripMenuItem(Loc.T("Ocultar en capturas/grabaciones 🕵️", "Hide from captures/recordings 🕵️"))
