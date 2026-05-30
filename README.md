@@ -6,7 +6,9 @@ Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit
 web, see your screen, control your browser and run actions — all by chatting with
 it in a built-in chat.
 
-[![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
+[![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) [![Download](https://img.shields.io/github/v/release/lordmacu/flubber-ai-companion?label=download&color=brightgreen)](https://github.com/lordmacu/flubber-ai-companion/releases/latest) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
+
+### ⬇️ [**Download Flubber.app**](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip) &nbsp;·&nbsp; [all releases](https://github.com/lordmacu/flubber-ai-companion/releases)
 
 > 🕵️ **Invisible on screen captures & screen shares.** Flubber's window does
 > **not** appear in screenshots, screen recordings, or screen sharing — Google
@@ -183,21 +185,21 @@ build.sh              # compiles and packages Flubber.app
 User data: `~/Library/Application Support/SlimePet/`
 (`state.json`, `config.json`, `conversations.json`, `shots/`, `slimepet.log`).
 
-## ⬇️ Download (CI builds)
+## ⬇️ Download
 
-Every push is built by **GitHub Actions** on a macOS runner
-([`.github/workflows/build.yml`](.github/workflows/build.yml)), so you don't need
-to compile it yourself:
+**👉 [Download the latest Flubber.app.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip)** — no need to compile.
 
-- **Latest build:** [Actions tab](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) → open the most recent run → **Artifacts** → **Flubber-macos** (`Flubber.app.zip`).
-- **Releases:** pushing a `vX.Y.Z` tag publishes a downloadable [Release](https://github.com/lordmacu/flubber-ai-companion/releases) with the `.app` attached:
-  ```bash
-  git tag v1.0.0 && git push origin v1.0.0
-  ```
+1. Download and unzip → drag **Flubber.app** to `/Applications` (or wherever you like).
+2. Open it (lives in the menu bar: 🟢). First launch: if macOS warns it's unverified, allow it in **Settings → Privacy & Security → "Open Anyway"**.
+3. Optional: 🟢 menu → **Launch at login**.
 
-> CI builds are **ad-hoc signed** (not notarized). The first time you open the
-> app, macOS may ask you to allow it in **Settings → Privacy & Security → "Open
-> Anyway"**. Then it runs normally.
+Every push is also built by **GitHub Actions**
+([`.github/workflows/build.yml`](.github/workflows/build.yml)); you can grab any
+build from the [Actions tab](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml)
+→ a run → **Artifacts**, and every `vX.Y.Z` tag publishes a
+[Release](https://github.com/lordmacu/flubber-ai-companion/releases).
+
+> Builds are **ad-hoc signed** (not notarized) — hence the one-time "Open Anyway".
 
 ---
 
