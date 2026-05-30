@@ -32,20 +32,15 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Firma con una identidad ESTABLE si está disponible (así los permisos del sistema
-# —Grabación de pantalla, Automatización— SOBREVIVEN a recompilaciones, porque el
-# permiso se ata a la identidad y no a la huella del binario).
-# Importante: SIN hardened runtime (eso disparaba el aviso de "malware").
-# En CI (sin certificado) cae a firma ad-hoc automáticamente.
-SIGN_ID="${FLUBBER_SIGN_ID:-A3ADB32024EDBDC374BE1075BC8189E037245868}"
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
-  echo "🔏 Firmando con identidad estable…"
-  codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
-    || codesign --force --deep --sign - "$APP" 2>/dev/null || true
-else
-  echo "🔏 Firma ad-hoc (sin identidad estable)…"
-  codesign --force --deep --sign - "$APP" 2>/dev/null || true
-fi
+# Firma AD-HOC. Es la que deja ABRIR la app sin el bloqueo de Gatekeeper
+# ("no se puede verificar / Abrir de todos modos") que sí ocurre con un
+# certificado de desarrollo no notarizado.
+# Nota: el permiso de Grabación de pantalla SÍ sobrevive a reinicios del Mac;
+# solo se reinicia si se RECOMPILA la app (cambia la huella ad-hoc).
+# (Para forzar otra identidad: FLUBBER_SIGN_ID=<hash> ./build.sh)
+SIGN_ID="${FLUBBER_SIGN_ID:--}"
+codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null \
+  || codesign --force --deep --sign - "$APP" 2>/dev/null || true
 
 # Quita la "cuarentena" para que Gatekeeper no lo bloquee (app local).
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
