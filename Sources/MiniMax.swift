@@ -104,8 +104,13 @@ struct AIConfig: Codable {
     var allowBrowser: Bool? = nil
     var allowCommand: Bool? = nil
     var allowOpen: Bool? = nil
+    // Ocultar la ventana de Flubber en capturas / grabaciones / compartir pantalla.
+    // Habilitado por defecto (nil => true) para mantener la privacidad.
+    var hideFromCapture: Bool? = nil
     // común
     var customSkin: SkinSpec? = nil
+
+    var hideFromCaptureValue: Bool { hideFromCapture ?? true }
 
     var claudeKeyValue: String { claudeKey ?? "" }
     var claudeModelValue: String { (claudeModel?.isEmpty == false) ? claudeModel! : "claude-haiku-4-5-20251001" }
@@ -278,6 +283,8 @@ final class OpenAIBackend: AIBackend {
     var name: String { isOpenAI ? "OpenAI" : "DeepSeek" }
     var chatURL: String { base + "/chat/completions" }
     var isConfigured: Bool { !key.trimmingCharacters(in: .whitespaces).isEmpty }
+    // OpenAI deprecó max_tokens → max_completion_tokens; DeepSeek sigue con max_tokens.
+    var tokenParam: String { isOpenAI ? "max_completion_tokens" : "max_tokens" }
 
     private func makeRequest(_ body: [String: Any], timeout: TimeInterval) -> URLRequest? {
         guard isConfigured, let url = URL(string: chatURL),
@@ -320,7 +327,7 @@ final class OpenAIBackend: AIBackend {
         return msgs
     }
     private func body(_ messages: [AIMessage], _ tools: [ToolDef]?, _ maxTokens: Int, stream: Bool) -> [String: Any] {
-        var b: [String: Any] = ["model": model, "messages": oaiMessages(messages), "max_tokens": maxTokens, "temperature": 0.3]
+        var b: [String: Any] = ["model": model, "messages": oaiMessages(messages), tokenParam: maxTokens, "temperature": 0.3]
         if stream { b["stream"] = true }
         if let tools = tools, !tools.isEmpty {
             b["tools"] = tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description, "parameters": $0.parameters]] }
@@ -334,7 +341,7 @@ final class OpenAIBackend: AIBackend {
         var msgs: [[String: Any]] = [["role": "system", "content": system]]
         for (r, c) in history { msgs.append(["role": r, "content": c]) }
         if let user { msgs.append(["role": "user", "content": user]) }
-        post(["model": model, "messages": msgs, "max_tokens": maxTokens, "temperature": 1.0], timeout: 20) { data in
+        post(["model": model, "messages": msgs, tokenParam: maxTokens, "temperature": 1.0], timeout: 20) { data in
             DispatchQueue.main.async { completion(data.flatMap { Self.parseText($0) }) }
         }
     }
@@ -354,7 +361,7 @@ final class OpenAIBackend: AIBackend {
     func vision(prompt: String, imageBase64: String, completion: @escaping (String?) -> Void) {
         func done(_ s: String?) { DispatchQueue.main.async { completion(s) } }
         guard isConfigured, isOpenAI else { done(nil); return }   // DeepSeek no tiene visión
-        let b: [String: Any] = ["model": model, "max_tokens": 1024, "temperature": 0.2, "messages": [[
+        let b: [String: Any] = ["model": model, tokenParam: 1024, "temperature": 0.2, "messages": [[
             "role": "user", "content": [
                 ["type": "text", "text": prompt],
                 ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(imageBase64)"]]]]]]
@@ -363,7 +370,7 @@ final class OpenAIBackend: AIBackend {
     func webSearch(_ query: String, completion: @escaping (String) -> Void) { WebTools.search(query, completion) }
 
     func test(completion: @escaping (Bool, String) -> Void) {
-        guard let req = makeRequest(["model": model, "messages": [["role": "user", "content": "ping"]], "max_tokens": 8], timeout: 20) else {
+        guard let req = makeRequest(["model": model, "messages": [["role": "user", "content": "ping"]], tokenParam: 8], timeout: 20) else {
             DispatchQueue.main.async { completion(false, "Falta la clave.") }; return
         }
         URLSession.shared.dataTask(with: req) { data, resp, err in
