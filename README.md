@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon/icon.png" alt="Flubber app icon" width="160">
+</p>
+
 # 🟢 Flubber — AI slime pet for macOS
 
 Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit**
@@ -189,9 +193,9 @@ User data: `~/Library/Application Support/SlimePet/`
 
 ## ⬇️ Download
 
-**👉 [Download the latest Flubber.app.zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip)** — no need to compile.
+**👉 [Download the latest Flubber.dmg](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.dmg)** ([or the .zip](https://github.com/lordmacu/flubber-ai-companion/releases/latest/download/Flubber.app.zip)) — no need to compile.
 
-1. Download and unzip → move **Flubber.app** to `/Applications` (or wherever you like).
+1. Open the **`.dmg`** and **drag Flubber into Applications** (or unzip the `.zip` and move **Flubber.app** wherever you like).
 2. **First launch (important):** because the app is downloaded and not notarized by
    Apple, macOS will show *"Apple could not verify Flubber is free of malware"* with
    a **Move to Trash** button. **Don't** trash it — open it one of these ways:
