@@ -6,7 +6,7 @@ Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit
 web, see your screen, control your browser and run actions — all by chatting with
 it in a built-in chat.
 
-![build](https://img.shields.io/badge/build-swiftc-orange) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue)
+[![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
 
 > 🕵️ **Invisible on screen captures & screen shares.** Flubber's window does
 > **not** appear in screenshots, screen recordings, or screen sharing — Google
@@ -183,10 +183,21 @@ build.sh              # compiles and packages Flubber.app
 User data: `~/Library/Application Support/SlimePet/`
 (`state.json`, `config.json`, `conversations.json`, `shots/`, `slimepet.log`).
 
-## ⚙️ CI
+## ⬇️ Download (CI builds)
 
-GitHub Actions builds the app on every push and uploads `Flubber.app.zip` as an
-artifact ([`.github/workflows/build.yml`](.github/workflows/build.yml)).
+Every push is built by **GitHub Actions** on a macOS runner
+([`.github/workflows/build.yml`](.github/workflows/build.yml)), so you don't need
+to compile it yourself:
+
+- **Latest build:** [Actions tab](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) → open the most recent run → **Artifacts** → **Flubber-macos** (`Flubber.app.zip`).
+- **Releases:** pushing a `vX.Y.Z` tag publishes a downloadable [Release](https://github.com/lordmacu/flubber-ai-companion/releases) with the `.app` attached:
+  ```bash
+  git tag v1.0.0 && git push origin v1.0.0
+  ```
+
+> CI builds are **ad-hoc signed** (not notarized). The first time you open the
+> app, macOS may ask you to allow it in **Settings → Privacy & Security → "Open
+> Anyway"**. Then it runs normally.
 
 ---
 
