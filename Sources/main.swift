@@ -1749,6 +1749,65 @@ final class PetWindow: NSWindow {
     func applyCapturePrivacy(_ hidden: Bool) { sharingType = hidden ? .none : .readOnly }
 }
 
+// MARK: - Ícono de la barra de menús (mismo pixel-art del slime)
+
+/// Dibuja el slime verde (cuerpo + brillo + cara feliz) en una NSImage pequeña,
+/// usando la misma lógica de grilla que `PetView.drawSlime` / `drawFace`.
+/// Es el mismo arte del ícono de la app, pero sin fondo, para el status item.
+func slimeStatusImage(size S: CGFloat = 18) -> NSImage {
+    let body  = NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 1)
+    let dark  = NSColor(srgbRed: 0.20, green: 0.62, blue: 0.40, alpha: 1)
+    let light = NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1)
+    let shine = NSColor(srgbRed: 0.92, green: 1.00, blue: 0.95, alpha: 1)
+    let eye      = NSColor(srgbRed: 0.10, green: 0.16, blue: 0.18, alpha: 1)
+    let eyeWhite = NSColor.white
+    let mouth    = NSColor(srgbRed: 0.15, green: 0.40, blue: 0.28, alpha: 1)
+
+    let img = NSImage(size: NSSize(width: S, height: S), flipped: false) { _ in
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+        let cx = 16.0, footY = 3
+        let halfW = 11.0, height = 17.0
+        let cell = S * 0.94 / 23.0                 // encaja el ancho del slime (~23 celdas)
+        let originX = S / 2 - CGFloat(cx) * cell
+        let originY = S / 2 - 11.5 * cell           // centra el bbox vertical (grid y ≈ 3..20)
+        func fill(_ gx: Int, _ gy: Int, _ c: NSColor) {
+            ctx.setShouldAntialias(false)
+            ctx.setFillColor(c.cgColor)
+            ctx.fill(CGRect(x: originX + CGFloat(gx) * cell, y: originY + CGFloat(gy) * cell,
+                            width: cell + 0.4, height: cell + 0.4))
+        }
+        // cuerpo (misma fórmula elíptica + borde + highlight)
+        for gy in 0..<Int(height) {
+            let t = Double(gy) / height
+            var w = halfW * (max(0, 1 - pow(t, 2.2))).squareRoot()
+            w += sin(t * 3) * 0.25
+            let xw = Int(w.rounded()); let y = footY + gy
+            for dx in -xw...xw {
+                let gx = Int(cx) + dx
+                let edge = dx <= -xw + 1 || dx >= xw - 1 || gy == 0 || gy >= Int(height) - 1
+                if edge { fill(gx, y, dark) }
+                else if dx < 0 && t > 0.45 && t < 0.85 && dx > -xw + 3 { fill(gx, y, light) }
+                else { fill(gx, y, body) }
+            }
+        }
+        let shineY = footY + Int(height * 0.72)
+        fill(Int(cx) - 4, shineY, shine); fill(Int(cx) - 5, shineY, shine); fill(Int(cx) - 4, shineY - 1, shine)
+        // cara feliz mirando al frente
+        let faceY = footY + Int(height * 0.45)
+        let leftX = Int(cx) - 4, rightX = Int(cx) + 4
+        func eyeOpen(_ ex: Int) {
+            for oy in 0..<4 { for ox in 0..<3 { fill(ex + ox, faceY + oy, eyeWhite) } }
+            for oy in 0..<2 { for ox in 0..<2 { fill(ex + 1 + ox, faceY + 1 + oy, eye) } }
+        }
+        eyeOpen(leftX); eyeOpen(rightX)
+        for ox in -2...2 { fill(Int(cx) + ox, faceY - 3, mouth) }
+        for ox in -1...1 { fill(Int(cx) + ox, faceY - 4, mouth) }
+        return true
+    }
+    img.isTemplate = false      // a color (no monocromo), como el ícono de la app
+    return img
+}
+
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -1794,7 +1853,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem?.button?.title = "🟢"
+        statusItem?.button?.image = slimeStatusImage()      // mismo slime pixel-art que el ícono
+        statusItem?.button?.title = ""
         rebuildMenu()
 
         lastTick = Date()
