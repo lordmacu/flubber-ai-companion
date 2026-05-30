@@ -291,11 +291,12 @@ final class OpenAIBackend: AIBackend {
     }
     private func post(_ body: [String: Any], timeout: TimeInterval, completion: @escaping (Data?) -> Void) {
         guard let req = makeRequest(body, timeout: timeout) else { completion(nil); return }
-        Log.write("→ \(name) POST \(chatURL) model=\(model)")
+        let nm = name
+        Log.write("→ \(nm) POST \(chatURL) model=\(model)")
         URLSession.shared.dataTask(with: req) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            if let err = err { Log.write("← \(name) ERROR \(err.localizedDescription)") }
-            else { Log.write("← \(name) HTTP \(code) \(String((data.flatMap { String(data: $0, encoding: .utf8) } ?? "").prefix(300)))") }
+            if let err = err { Log.write("← \(nm) ERROR \(err.localizedDescription)") }
+            else { Log.write("← \(nm) HTTP \(code) \(String((data.flatMap { String(data: $0, encoding: .utf8) } ?? "").prefix(300)))") }
             completion(err == nil ? data : nil)
         }.resume()
     }

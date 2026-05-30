@@ -67,15 +67,17 @@ animations.
 ## 🧠 AI (optional)
 
 Flubber is **designed primarily for MiniMax**, but it's also **compatible with
-other models** — it supports **two providers**, selectable on the settings screen:
+other models** — it supports **four providers**, selectable on the settings screen:
 
-| Provider | Endpoint | Models |
-|---|---|---|
-| **MiniMax** (Token/Coding Plan) — *recommended* | Anthropic-compatible API | MiniMax-M2.7 / M2.5 / M2.1 / M2 |
-| **Claude** (Anthropic) | Messages API | Opus 4.8 / Sonnet 4.6 / **Haiku 4.5** |
+| Provider | Endpoint | Models | Vision |
+|---|---|---|---|
+| **MiniMax** (Token/Coding Plan) — *recommended* | Anthropic-compatible | M2.7 / M2.5 / M2.1 / M2 | ✅ (VLM) |
+| **Claude** (Anthropic) | Messages API | Opus 4.8 / Sonnet 4.6 / **Haiku 4.5** | ✅ |
+| **ChatGPT** (OpenAI) | Chat Completions | gpt-4o / gpt-4o-mini / gpt-4.1(-mini) | ✅ |
+| **DeepSeek** | Chat Completions | deepseek-chat / deepseek-reasoner | ❌ |
 
-Because MiniMax exposes an Anthropic-compatible API, any other model that speaks
-that same API can be plugged in as well.
+All providers use **real streaming (SSE)** and tools (function calling). The
+key/model for the active provider is saved in a protected local file.
 
 Set it up in 🟢 → **Configure AI**: pick a provider, click **"Open console"** to
 get your key, paste it, choose a model and **Test the connection**. Only the

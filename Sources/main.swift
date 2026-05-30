@@ -1,5 +1,6 @@
 import Cocoa
 import UserNotifications
+import ServiceManagement
 
 // ============================================================================
 // SlimePet — mascota slime pixel-art + Tamagotchi para macOS.
@@ -1870,6 +1871,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: Loc.t("Cambiar color 🎨", "Change color 🎨"), action: #selector(cycleColor), keyEquivalent: "k"))
         menu.addItem(NSMenuItem(title: Loc.t("Nuevo huevo 🥚 (reiniciar)", "New egg 🥚 (restart)"), action: #selector(restart), keyEquivalent: ""))
         menu.addItem(.separator())
+        let li = NSMenuItem(title: Loc.t("Iniciar al encender el Mac 🔌", "Launch at login 🔌"), action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        if #available(macOS 13, *) { li.state = SMAppService.mainApp.status == .enabled ? .on : .off }
+        menu.addItem(li)
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: Loc.t("Salir de Flubber", "Quit Flubber"), action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
     }
@@ -1895,6 +1900,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func rollNow()  { view.enter(.rolling) }
     @objc func cycleColor() { Pal.index = (Pal.index + 1) % Pal.skins.count; view.stats.skinIndex = Pal.index }
     @objc func restart() { view.doRestart() }
+    @objc func toggleLaunchAtLogin() {
+        guard #available(macOS 13, *) else { return }
+        do {
+            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
+            else { try SMAppService.mainApp.register() }
+        } catch { NSLog("login item: \(error)") }
+        rebuildMenu()
+    }
     @objc func resetPerms() {
         guard var c = view.client?.config else { return }
         c.allowBrowser = nil; c.allowCommand = nil; c.allowOpen = nil
