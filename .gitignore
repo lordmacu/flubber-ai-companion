@@ -1,0 +1,7 @@
+# Build output
+*.app/
+*.app.zip
+build/
+.DS_Store
+
+# Datos locales del usuario viven en ~/Library/Application Support/SlimePet
