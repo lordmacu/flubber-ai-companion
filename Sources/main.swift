@@ -159,8 +159,10 @@ final class PetView: NSView {
     var lastSpontaneous = Date.distantPast
     var lastClickTalk = Date.distantPast
     var onChatRequested: (() -> Void)?
-    var onToggleListen: (() -> Void)?
-    var listening = false                 // escuchando la reunión (para el indicador 👂)
+    var onToggleListen: (() -> Void)?     // 👂 audio del sistema
+    var onToggleMic: (() -> Void)?        // 🎤 micrófono
+    var listening = false                 // 👂 escuchando el sistema (para el icono)
+    var micOn = false                     // 🎤 micrófono activo (para el icono)
 
     // chat integrado (panel pixel sobre el slime)
     var chatActive = false
@@ -978,6 +980,71 @@ final class PetView: NSView {
         (s as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attrs)
     }
 
+    /// Dibuja un icono pixel-art centrado en `rect`. Cada char de `rows` mapea a
+    /// un color en `palette` ('0' = transparente). Fila 0 = arriba.
+    func drawPixelIcon(_ ctx: CGContext, _ rows: [String], in rect: NSRect, _ palette: [Character: NSColor]) {
+        let cols = rows.map { $0.count }.max() ?? 0
+        let n = rows.count
+        guard cols > 0, n > 0 else { return }
+        let cell = max(1, floor(min(rect.width, rect.height) / CGFloat(max(cols, n))))
+        let gw = cell * CGFloat(cols), gh = cell * CGFloat(n)
+        let ox = rect.minX + (rect.width - gw) / 2
+        let oy = rect.minY + (rect.height - gh) / 2
+        for (r, row) in rows.enumerated() {
+            for (i, ch) in row.enumerated() {
+                guard let c = palette[ch] else { continue }
+                ctx.setFillColor(c.cgColor)
+                ctx.fill(CGRect(x: ox + CGFloat(i) * cell,
+                                y: oy + CGFloat(n - 1 - r) * cell,
+                                width: cell + 0.4, height: cell + 0.4))
+            }
+        }
+    }
+
+    // Iconos pixel-art del header del chat (a juego con el slime).
+    static let eyeIcon = [
+        "000000000",
+        "00EEEEE00",
+        "0EE000EE0",
+        "EE0WWW0EE",
+        "0EE000EE0",
+        "00EEEEE00",
+        "000000000",
+    ]
+    static let earIcon = [
+        "00BBB00",
+        "0BBBBB0",
+        "BBPPPBB",
+        "BBPP0BB",
+        "BBPP00B",
+        "BBPP0B0",
+        "0BBPB00",
+        "00BBB00",
+        "000B000",
+    ]
+    static let micIcon = [
+        "0011100",
+        "0MMMMM0",
+        "0MMMMM0",
+        "0MMMMM0",
+        "0MMMMM0",
+        "M0MMM0M",
+        "M01110M",
+        "0001000",
+        "0011100",
+    ]
+    static let stopIcon = [
+        "0000000",
+        "0RRRRR0",
+        "0RRRRR0",
+        "0RRRRR0",
+        "0RRRRR0",
+        "0RRRRR0",
+        "0000000",
+    ]
+    static let chatAccent = NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1)
+    static let chatRecRed = NSColor(srgbRed: 0.96, green: 0.36, blue: 0.40, alpha: 1)
+
     /// Icono que funciona como medidor: el fondo va apagado (vacío) y la
     /// porción inferior se "llena" con el color del propio emoji según `value`.
     func drawStatIcon(_ ctx: CGContext, _ icon: String, _ x: CGFloat, _ y: CGFloat, size: CGFloat, value: Double) {
@@ -1572,11 +1639,18 @@ final class PetView: NSView {
                  color: NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1))
         let bs: CGFloat = 20, gapb: CGFloat = 4
         var bxr = header.maxX - 8 - bs
-        for (id, icon) in [("close", "✕"), ("new", "＋"), ("list", "☰"), ("eye", "👁️"), ("ear", listening ? "⏹️" : "👂")] {
+        for (id, icon) in [("close", "✕"), ("new", "＋"), ("list", "☰"), ("eye", "👁️"), ("ear", listening ? "⏹️" : "👂"), ("mic", micOn ? "⏹️" : "🎤")] {
             let r = NSRect(x: bxr, y: header.minY + 4, width: bs, height: bs)
             let p = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
             NSColor(white: 1, alpha: 0.12).setFill(); p.fill()
-            drawText(icon, r.minX + 4, r.minY + 3, size: 12)
+            switch id {
+            case "eye": drawPixelIcon(ctx, Self.eyeIcon, in: r, ["E": Self.chatAccent, "W": .white])
+            case "ear": drawPixelIcon(ctx, listening ? Self.stopIcon : Self.earIcon, in: r,
+                                      listening ? ["R": Self.chatRecRed] : ["B": Self.chatAccent, "P": Pal.heart])
+            case "mic": drawPixelIcon(ctx, micOn ? Self.stopIcon : Self.micIcon, in: r,
+                                      micOn ? ["R": Self.chatRecRed] : ["M": Self.chatAccent])
+            default:    drawText(icon, r.minX + 4, r.minY + 3, size: 12)
+            }
             chatButtons.append(HudButton(id: id, icon: icon, rect: r))
             bxr -= bs + gapb
         }
@@ -1831,6 +1905,7 @@ final class PetView: NSView {
             case "list": listOpen.toggle(); needsDisplay = true
             case "eye": captureScreen()
             case "ear": onToggleListen?()
+            case "mic": onToggleMic?()
             default: break
             }
             return true
@@ -2122,6 +2197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let spec = cfg.customSkin, let skin = Pal.skin(from: spec) { Pal.setAISkin(skin) }
         view.onChatRequested = { [weak self] in self?.openChat() }
         view.onToggleListen = { [weak self] in self?.toggleListen() }
+        view.onToggleMic = { [weak self] in self?.toggleMic() }
 
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
@@ -2215,6 +2291,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ? Loc.t("Dejar de escuchar la reunión ⏹️", "Stop listening to meeting ⏹️")
                 : Loc.t("Escuchar la reunión 🎧", "Listen to meeting 🎧")
             menu.addItem(NSMenuItem(title: title, action: #selector(toggleListen), keyEquivalent: ""))
+            let micTitle = l.micOn
+                ? Loc.t("Apagar micrófono ⏹️", "Turn off microphone ⏹️")
+                : Loc.t("Incluir mi micrófono 🎤", "Include my microphone 🎤")
+            menu.addItem(NSMenuItem(title: micTitle, action: #selector(toggleMic), keyEquivalent: ""))
             if !l.fullText.isEmpty {
                 menu.addItem(NSMenuItem(title: Loc.t("Resumir la reunión 📝", "Summarize meeting 📝"), action: #selector(summarizeMeeting), keyEquivalent: ""))
             }
@@ -2352,6 +2432,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.view.say(Loc.t("Escuchando… 🎧", "Listening… 🎧"))
                     } else {
                         self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))
+                    }
+                    self?.rebuildMenu()
+                }
+            }
+        }
+    }
+
+    @objc func toggleMic() {
+        guard #available(macOS 13.0, *) else {
+            notify("Flubber", Loc.t("El micrófono requiere macOS 13+.", "Mic requires macOS 13+.")); return
+        }
+        let l = MeetingListener.shared
+        if l.micOn {
+            l.stopMic()
+            view.micOn = false
+            view.say(Loc.t("Apagué el micrófono 🎤", "Mic off 🎤"))
+            rebuildMenu()
+        } else {
+            l.startMic { [weak self] ok, err in
+                DispatchQueue.main.async {
+                    if ok {
+                        self?.view.micOn = true
+                        self?.view.say(Loc.t("Te escucho 🎤", "I can hear you 🎤"))
+                    } else {
+                        self?.notify("Flubber", err ?? Loc.t("No pude usar el micrófono.", "Couldn't use the mic."))
                     }
                     self?.rebuildMenu()
                 }
