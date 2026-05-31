@@ -799,4 +799,30 @@ public partial class PetWindow : Window, IPlatformBridge
         var r = System.Windows.MessageBox.Show(detail, title, MessageBoxButton.YesNo, MessageBoxImage.Question);
         return Task.FromResult((r == MessageBoxResult.Yes, false));
     });
+
+    // --- Micrófono (🎤) para el agente/chat ---
+    public Task<string> StartMicAsync() => Dispatcher.Invoke(() =>
+    {
+        if (MicListener.Shared.Start(out var err)) { _tray.ContextMenuStrip = BuildMenu(); return Task.FromResult(Loc.T("Activé tu micrófono 🎤", "Turned on your mic 🎤")); }
+        return Task.FromResult(err ?? Loc.T("No pude usar el micrófono.", "Couldn't use the mic."));
+    });
+
+    public Task<string> StopMicAsync() => Dispatcher.Invoke(() =>
+    {
+        MicListener.Shared.Stop(); _tray.ContextMenuStrip = BuildMenu();
+        return Task.FromResult(Loc.T("Apagué el micrófono 🎤", "Mic off 🎤"));
+    });
+
+    public string MeetingTranscript
+    {
+        get
+        {
+            var sys = MeetingListener.Shared.FullText.Trim();
+            var mic = MicListener.Shared.FullText.Trim();
+            var parts = new List<string>();
+            if (sys.Length > 0) parts.Add("[" + Loc.T("ellos", "them") + "] " + sys);
+            if (mic.Length > 0) parts.Add("[" + Loc.T("tú", "you") + "] " + mic);
+            return string.Join("\n", parts);
+        }
+    }
 }
