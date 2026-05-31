@@ -1,12 +1,12 @@
 #!/bin/bash
-# Crea Flubber.dmg con la pantalla clásica de instalación:
-# el ícono de Flubber con una flecha → carpeta Applications para arrastrarlo.
+# Creates Flubber.dmg with the classic install screen:
+# the Flubber icon with an arrow → Applications folder to drag it into.
 #
-# Modos:
-#   ./make-dmg.sh             -> usa Finder para componer el layout y GUARDA
-#                                el resultado en dmg/DS_Store (para versionarlo).
-#   ./make-dmg.sh --prebuilt  -> NO usa Finder; reutiliza dmg/DS_Store.
-#                                (se activa solo también si la var CI=true, p.ej. en GitHub Actions)
+# Modes:
+#   ./make-dmg.sh             -> uses Finder to compose the layout and SAVES
+#                                the result to dmg/DS_Store (to version it).
+#   ./make-dmg.sh --prebuilt  -> does NOT use Finder; reuses dmg/DS_Store.
+#                                (also enabled automatically if CI=true, e.g. on GitHub Actions)
 set -e
 cd "$(dirname "$0")"
 
@@ -17,38 +17,38 @@ DMG_FINAL="Flubber.dmg"
 STAGE="dmg-stage"
 DS_STORE_SAVED="dmg/DS_Store"
 
-# Modo sin Finder: por flag o cuando corre en CI.
+# Finder-less mode: via flag or when running in CI.
 PREBUILT=0
 [ "$1" = "--prebuilt" ] && PREBUILT=1
 [ "${CI:-}" = "true" ] && PREBUILT=1
 
-# 1) Asegura el .app compilado.
+# 1) Ensure the .app is built.
 [ -d "$APP" ] || ./build.sh
 
-# 2) Genera el fondo de la ventana del DMG.
+# 2) Generate the DMG window background.
 echo "🎨 Generando fondo del instalador…"
 swiftc -O dmg/make-bg.swift -o /tmp/flubber-mkbg -framework Cocoa
 /tmp/flubber-mkbg dmg/background.png
 
-# 3) Carpeta de staging: la app + alias a /Applications + fondo oculto.
+# 3) Staging folder: the app + alias to /Applications + hidden background.
 rm -rf "$STAGE"; mkdir -p "$STAGE/.background"
 cp -R "$APP" "$STAGE/"
 cp dmg/background.png "$STAGE/.background/background.png"
 ln -s /Applications "$STAGE/Applications"
 
-# En modo prebuilt, inyecta el layout ya capturado (sin Finder).
+# In prebuilt mode, inject the already-captured layout (without Finder).
 if [ "$PREBUILT" = "1" ]; then
   [ -f "$DS_STORE_SAVED" ] || { echo "❌ Falta $DS_STORE_SAVED (genéralo una vez en local sin --prebuilt)"; exit 1; }
   cp "$DS_STORE_SAVED" "$STAGE/.DS_Store"
 fi
 
-# 4) DMG temporal de lectura/escritura.
+# 4) Temporary read/write DMG.
 rm -f "$DMG_TMP" "$DMG_FINAL"
 echo "📦 Creando imagen…"
 hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ \
   -format UDRW -ov "$DMG_TMP" >/dev/null
 
-# 5) Monta. En modo interactivo, compone el layout con Finder y lo guarda.
+# 5) Mount. In interactive mode, compose the layout with Finder and save it.
 if [ "$PREBUILT" = "0" ]; then
   DEV=$(hdiutil attach -readwrite -noverify -noautoopen "$DMG_TMP" | grep -E '^/dev/' | head -1 | awk '{print $1}')
   sleep 2
@@ -75,17 +75,17 @@ tell application "Finder"
 end tell
 EOF
   sync
-  cp "/Volumes/$VOL/.DS_Store" "$DS_STORE_SAVED"   # guarda el layout para CI
+  cp "/Volumes/$VOL/.DS_Store" "$DS_STORE_SAVED"   # save the layout for CI
   echo "💾 Layout guardado en $DS_STORE_SAVED"
   hdiutil detach "$DEV" >/dev/null || hdiutil detach "$DEV" -force >/dev/null
 fi
 
-# 6) Convierte a comprimido de solo lectura (lo distribuible).
+# 6) Convert to read-only compressed (the distributable one).
 echo "🗜️  Comprimiendo…"
 hdiutil convert "$DMG_TMP" -format UDZO -imagekey zlib-level=9 -o "$DMG_FINAL" >/dev/null
 rm -f "$DMG_TMP"; rm -rf "$STAGE"
 
-# Quita la cuarentena (app local).
+# Remove the quarantine (local app).
 xattr -dr com.apple.quarantine "$DMG_FINAL" 2>/dev/null || true
 
 echo "✅ Listo: $(pwd)/$DMG_FINAL"

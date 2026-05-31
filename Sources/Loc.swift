@@ -1,14 +1,14 @@
 import Foundation
 
 // ============================================================================
-// Loc.swift — idioma de la app (interfaz + prompts + respuestas).
-// Por defecto sigue al sistema; se puede forzar a "es" o "en" y cambia al vuelo.
+// Loc.swift — the app's language (interface + prompts + responses).
+// Follows the system by default; can be forced to "es" or "en" and switches on the fly.
 // ============================================================================
 
 enum Lang { case es, en }
 
 enum Loc {
-    /// nil = seguir al sistema; "es"/"en" = forzado por el usuario.
+    /// nil = follow the system; "es"/"en" = forced by the user.
     static var override: String?
 
     static var lang: Lang {
@@ -17,7 +17,7 @@ enum Loc {
         return sys.hasPrefix("es") ? .es : .en
     }
 
-    /// Devuelve la cadena en el idioma actual.
+    /// Returns the string in the current language.
     static func t(_ es: String, _ en: String) -> String { lang == .es ? es : en }
 
     static var isES: Bool { lang == .es }

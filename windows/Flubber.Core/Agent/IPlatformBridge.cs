@@ -1,23 +1,23 @@
 namespace Flubber.Core.Agent;
 
 /// <summary>
-/// Puente hacia la capa de Windows (UI + APIs nativas). El Agent (portable) llama
-/// a estos métodos para las herramientas que dependen del SO: captura de pantalla,
-/// control de la mascota, navegador, abrir/ejecutar, recordatorios y confirmaciones.
-/// La app WPF implementa esta interfaz.
+/// Bridge to the Windows layer (UI + native APIs). The (portable) Agent calls
+/// these methods for the tools that depend on the OS: screen capture,
+/// pet control, browser, open/run, reminders and confirmations.
+/// The WPF app implements this interface.
 /// </summary>
 public interface IPlatformBridge
 {
     PetStats Stats { get; }
 
-    /// <summary>Captura. appHint null/"" = pantalla completa; si no, intenta esa app/ventana.
-    /// Devuelve (jpegBase64, rutaThumbnail) o (null, null) si falló/sin permiso.</summary>
+    /// <summary>Capture. appHint null/"" = full screen; otherwise, tries that app/window.
+    /// Returns (jpegBase64, thumbnailPath) or (null, null) if it failed/no permission.</summary>
     Task<(string? Base64, string? Path)> CaptureScreenAsync(string? appHint);
 
-    /// <summary>Muestra el thumbnail de la captura en el chat.</summary>
+    /// <summary>Shows the capture thumbnail in the chat.</summary>
     void AttachShot(string path);
 
-    /// <summary>Controla la mascota: bailar|rodar|pasear|feliz|dormir|color|skin. Devuelve mensaje.</summary>
+    /// <summary>Controls the pet: bailar|rodar|pasear|feliz|dormir|color|skin. Returns a message.</summary>
     string ControlSlime(string accion, string tema);
 
     Task<string> BrowserGetUrlAsync();
@@ -28,11 +28,11 @@ public interface IPlatformBridge
 
     void ScheduleReminder(string text, double seconds);
 
-    /// <summary>Pide confirmación al usuario. Devuelve (aprobado, "permitir siempre").</summary>
+    /// <summary>Asks the user for confirmation. Returns (approved, "always allow").</summary>
     Task<(bool Ok, bool Always)> ConfirmAsync(string title, string detail);
 
-    // --- Escucha / transcripción (en Windows: micrófono vía dictado nativo) ---
-    Task<string> StartMicAsync();        // empieza a transcribir el micrófono
-    Task<string> StopMicAsync();         // deja de transcribir
-    string MeetingTranscript { get; }    // texto acumulado (para resumir)
+    // --- Listening / transcription (on Windows: microphone via native dictation) ---
+    Task<string> StartMicAsync();        // starts transcribing the microphone
+    Task<string> StopMicAsync();         // stops transcribing
+    string MeetingTranscript { get; }    // accumulated text (to summarize)
 }

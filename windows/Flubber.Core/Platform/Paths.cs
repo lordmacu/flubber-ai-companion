@@ -1,8 +1,8 @@
 namespace Flubber.Core.Platform;
 
 /// <summary>
-/// Rutas de datos del usuario. En macOS era ~/Library/Application Support/SlimePet;
-/// en Windows usamos %APPDATA%\SlimePet (Roaming).
+/// User data paths. On macOS it was ~/Library/Application Support/SlimePet;
+/// on Windows we use %APPDATA%\SlimePet (Roaming).
 /// </summary>
 public static class Paths
 {

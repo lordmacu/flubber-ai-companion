@@ -6,7 +6,7 @@ using Controls = System.Windows.Controls;
 
 namespace Flubber.App;
 
-/// <summary>Ventana de configuración de IA (proveedor, clave, modelo). Paridad con "Configurar IA" de macOS.</summary>
+/// <summary>AI settings window (provider, key, model). Parity with the macOS "AI settings" window.</summary>
 public sealed class SettingsWindow : Window
 {
     private readonly AIConfig _cfg;

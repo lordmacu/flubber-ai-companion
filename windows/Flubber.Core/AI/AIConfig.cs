@@ -5,8 +5,8 @@ using Flubber.Core.Platform;
 namespace Flubber.Core.AI;
 
 /// <summary>
-/// Configuración de IA + ajustes no sensibles. Puerto de AIConfig (MiniMax.swift).
-/// En Windows la clave se guarda en config.json (en macOS estaba en Keychain).
+/// AI configuration + non-sensitive settings. Port of AIConfig (MiniMax.swift).
+/// On Windows the key is stored in config.json (on macOS it was in the Keychain).
 /// </summary>
 public sealed class AIConfig
 {
@@ -29,14 +29,14 @@ public sealed class AIConfig
     public string? DeepseekKey { get; set; }
     public string? DeepseekModel { get; set; }
 
-    public string? Lang { get; set; }   // null=sistema, "es", "en"
+    public string? Lang { get; set; }   // null=system, "es", "en"
 
-    // "permitir siempre" por categoría
+    // "always allow" per category
     public bool? AllowBrowser { get; set; }
     public bool? AllowCommand { get; set; }
     public bool? AllowOpen { get; set; }
 
-    // Ocultar la ventana en capturas/grabaciones (habilitado por defecto).
+    // Hide the window from captures/recordings (enabled by default).
     public bool? HideFromCapture { get; set; }
 
     public SkinSpec? CustomSkin { get; set; }
@@ -68,8 +68,8 @@ public sealed class AIConfig
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
-    // Hooks de cifrado de secretos (los rellena la capa de Windows con DPAPI).
-    // Si quedan en null (p.ej. en CI/no-Windows), las claves se guardan en texto plano.
+    // Secret encryption hooks (filled in by the Windows layer with DPAPI).
+    // If left null (e.g. on CI/non-Windows), the keys are stored in plain text.
     public static Func<string, string>? ProtectFn;
     public static Func<string, string>? UnprotectFn;
 
@@ -88,7 +88,7 @@ public sealed class AIConfig
                 var c = JsonSerializer.Deserialize<AIConfig>(json);
                 if (c != null)
                 {
-                    // descifra las claves (UnprotectFn devuelve el texto plano si ya lo era — migración)
+                    // decrypt the keys (UnprotectFn returns the plain text if it already was — migration)
                     c.ApiKey = Dec(c.ApiKey);
                     c.ClaudeKey = DecN(c.ClaudeKey);
                     c.OpenaiKey = DecN(c.OpenaiKey);
@@ -105,7 +105,7 @@ public sealed class AIConfig
     {
         try
         {
-            // cifra las claves en una copia antes de escribir (la instancia en memoria queda en claro)
+            // encrypt the keys in a copy before writing (the in-memory instance stays in plain text)
             var clone = (AIConfig)MemberwiseClone();
             clone.ApiKey = Enc(ApiKey);
             clone.ClaudeKey = EncN(ClaudeKey);

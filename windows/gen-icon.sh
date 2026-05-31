@@ -1,9 +1,9 @@
 #!/bin/bash
-# Genera el icono de Windows (Flubber.ico + trayicon.png) usando EXACTAMENTE el
-# mismo render pixel-art que macOS (icon/make-icon.swift). Así el icono es 100%
-# idéntico en ambas plataformas. Correr en macOS (usa swiftc + sips).
+# Generates the Windows icon (Flubber.ico + trayicon.png) using EXACTLY the
+# same pixel-art render as macOS (icon/make-icon.swift). This makes the icon 100%
+# identical on both platforms. Run on macOS (uses swiftc + sips).
 set -e
-cd "$(dirname "$0")/.."   # raíz del repo
+cd "$(dirname "$0")/.."   # repo root
 
 echo "🎨 Render maestro (mismo que macOS)…"
 swiftc -O icon/make-icon.swift -o /tmp/flubber-mkicon -framework Cocoa

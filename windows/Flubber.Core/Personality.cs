@@ -12,7 +12,7 @@ public enum Situation
     Happy, Clicked, IdleChat,
 }
 
-/// <summary>El "cerebro" del slime (sin red), bilingüe ES/EN. Puerto de Personality.swift.</summary>
+/// <summary>The slime's "brain" (no network), bilingual ES/EN. Port of Personality.swift.</summary>
 public static class Personality
 {
     public static string CharacterWithName(string name) => Loc.T($$"""
@@ -59,7 +59,7 @@ public static class Personality
         return string.Join("\n", lines);
     }
 
-    /// <summary>System prompt del modo AGENTE (chat con herramientas).</summary>
+    /// <summary>System prompt for AGENT mode (chat with tools).</summary>
     public static string AgentSystem(PetStats s)
     {
         var stage = s.Stage.ToString().ToLowerInvariant();

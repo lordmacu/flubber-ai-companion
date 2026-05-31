@@ -5,12 +5,12 @@ namespace Flubber.Core;
 public enum Lang { Es, En }
 
 /// <summary>
-/// Idioma de la app (interfaz + prompts + respuestas). Por defecto sigue al sistema;
-/// se puede forzar a "es" o "en" y cambia al vuelo. Equivalente a Loc.swift.
+/// App language (interface + prompts + responses). By default it follows the system;
+/// it can be forced to "es" or "en" and changes on the fly. Equivalent to Loc.swift.
 /// </summary>
 public static class Loc
 {
-    /// <summary>null = seguir al sistema; "es"/"en" = forzado por el usuario.</summary>
+    /// <summary>null = follow the system; "es"/"en" = forced by the user.</summary>
     public static string? Override { get; set; }
 
     public static Lang Lang
@@ -23,7 +23,7 @@ public static class Loc
         }
     }
 
-    /// <summary>Devuelve la cadena en el idioma actual.</summary>
+    /// <summary>Returns the string in the current language.</summary>
     public static string T(string es, string en) => Lang == Lang.Es ? es : en;
 
     public static bool IsES => Lang == Lang.Es;

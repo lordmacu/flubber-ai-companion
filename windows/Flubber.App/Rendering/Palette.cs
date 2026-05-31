@@ -10,7 +10,7 @@ public readonly struct Skin
     { Body = body; BodyDark = dark; BodyLight = light; Shine = shine; }
 }
 
-/// <summary>Paleta del slime (skins + colores de cara). Puerto de Pal/Skin (main.swift).</summary>
+/// <summary>Slime palette (skins + face colors). Port of Pal/Skin (main.swift).</summary>
 public static class Palette
 {
     private static SKColor C(double r, double g, double b, double a = 1) =>
@@ -18,10 +18,10 @@ public static class Palette
 
     public static readonly Skin[] Skins =
     {
-        new(C(0.36, 0.85, 0.55), C(0.20, 0.62, 0.40), C(0.62, 0.96, 0.72), C(0.92, 1.00, 0.95)), // verde
-        new(C(0.42, 0.66, 0.98), C(0.24, 0.42, 0.78), C(0.68, 0.84, 1.00), C(0.90, 0.95, 1.00)), // azul
-        new(C(0.78, 0.55, 0.96), C(0.55, 0.34, 0.74), C(0.90, 0.76, 1.00), C(0.97, 0.93, 1.00)), // morado
-        new(C(0.99, 0.62, 0.78), C(0.85, 0.40, 0.58), C(1.00, 0.80, 0.89), C(1.00, 0.95, 0.97)), // rosa
+        new(C(0.36, 0.85, 0.55), C(0.20, 0.62, 0.40), C(0.62, 0.96, 0.72), C(0.92, 1.00, 0.95)), // green
+        new(C(0.42, 0.66, 0.98), C(0.24, 0.42, 0.78), C(0.68, 0.84, 1.00), C(0.90, 0.95, 1.00)), // blue
+        new(C(0.78, 0.55, 0.96), C(0.55, 0.34, 0.74), C(0.90, 0.76, 1.00), C(0.97, 0.93, 1.00)), // purple
+        new(C(0.99, 0.62, 0.78), C(0.85, 0.40, 0.58), C(1.00, 0.80, 0.89), C(1.00, 0.95, 0.97)), // pink
     };
 
     public static readonly Skin Sick = new(C(0.62, 0.74, 0.45), C(0.42, 0.54, 0.30), C(0.78, 0.86, 0.60), C(0.92, 0.96, 0.80));

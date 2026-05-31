@@ -1,5 +1,5 @@
-// Genera el fondo del instalador DMG (flecha + texto "Drag to Applications").
-// Uso: swiftc make-bg.swift -o mkbg -framework Cocoa && ./mkbg salida.png
+// Generates the DMG installer background (arrow + "Drag to Applications" text).
+// Usage: swiftc make-bg.swift -o mkbg -framework Cocoa && ./mkbg output.png
 import Cocoa
 
 let W = 660, H = 420
@@ -14,7 +14,7 @@ NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 let ctx = NSGraphicsContext.current!.cgContext
 
-// Fondo: degradado suave con acento verde Flubber.
+// Background: soft gradient with Flubber green accent.
 let cs = CGColorSpaceCreateDeviceRGB()
 let colors = [
     NSColor(calibratedWhite: 0.99, alpha: 1).cgColor,
@@ -24,7 +24,7 @@ if let grad = CGGradient(colorsSpace: cs, colors: colors, locations: [0, 1]) {
     ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: H), end: CGPoint(x: 0, y: 0), options: [])
 }
 
-// Flecha (coords origen abajo-izquierda; los íconos van a x≈180 y x≈480).
+// Arrow (origin coords bottom-left; the icons sit at x≈180 and x≈480).
 let green = NSColor(red: 0.20, green: 0.65, blue: 0.36, alpha: 1)
 green.setStroke(); green.setFill()
 let y: CGFloat = 210
@@ -41,7 +41,7 @@ head.line(to: CGPoint(x: 392, y: y - 17))
 head.close()
 head.fill()
 
-// Título.
+// Title.
 let para = NSMutableParagraphStyle(); para.alignment = .center
 func drawCentered(_ s: String, size: CGFloat, weight: NSFont.Weight, white: CGFloat, atTopY: CGFloat) {
     let attrs: [NSAttributedString.Key: Any] = [

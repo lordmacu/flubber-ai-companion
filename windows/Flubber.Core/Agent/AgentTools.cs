@@ -2,7 +2,7 @@ using Flubber.Core.AI;
 
 namespace Flubber.Core.Agent;
 
-/// <summary>Catálogo de herramientas (esquema OpenAI). Puerto del bloque `tools` de Agent.swift.</summary>
+/// <summary>Tool catalog (OpenAI schema). Port of the `tools` block from Agent.swift.</summary>
 public static class AgentTools
 {
     private static ToolDef Fn(string name, string desc, Dictionary<string, object?> props, string[] required) =>

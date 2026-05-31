@@ -7,12 +7,12 @@ using Flubber.Core.Util;
 namespace Flubber.App.Platform;
 
 /// <summary>
-/// Escucha el AUDIO DEL SISTEMA (lo que suena en una reunión de Meet/Teams/Zoom)
-/// con WASAPI loopback (NAudio) y lo transcribe ON-DEVICE con System.Speech.
-/// Acumula un transcript que el agente puede resumir. Equivalente a MeetingListener.swift.
+/// Listens to the SYSTEM AUDIO (what plays in a Meet/Teams/Zoom meeting)
+/// with WASAPI loopback (NAudio) and transcribes it ON-DEVICE with System.Speech.
+/// Accumulates a transcript that the agent can summarize. Equivalent to MeetingListener.swift.
 ///
-/// Nota: como en macOS, capta lo que sale por los altavoces (los demás), NO tu
-/// micrófono. La transcripción de System.Speech es gratis pero de calidad media.
+/// Note: as on macOS, it picks up what comes out of the speakers (the others), NOT your
+/// microphone. System.Speech transcription is free but of medium quality.
 /// </summary>
 public sealed class MeetingListener
 {
@@ -24,12 +24,12 @@ public sealed class MeetingListener
     private string _transcript = "";
     private string _partial = "";
 
-    /// <summary>Solo los segmentos finales (texto estable).</summary>
+    /// <summary>Only the final segments (stable text).</summary>
     public string Transcript { get { lock (_lock) return _transcript; } }
-    /// <summary>Final + lo que se está reconociendo ahora.</summary>
+    /// <summary>Final + whatever is being recognized right now.</summary>
     public string FullText { get { lock (_lock) return (_transcript + " " + _partial).Trim(); } }
 
-    /// <summary>Se dispara con cada segmento final nuevo (texto).</summary>
+    /// <summary>Fires on each new final segment (text).</summary>
     public event Action<string>? SegmentRecognized;
 
     private WasapiLoopbackCapture? _capture;
@@ -47,8 +47,8 @@ public sealed class MeetingListener
         if (IsListening) return true;
         try
         {
-            Log.Write("🎧 listen.start — abriendo WASAPI loopback…");
-            _capture = new WasapiLoopbackCapture();   // dispositivo de salida por defecto
+            Log.Write("🎧 listen.start — opening WASAPI loopback…");
+            _capture = new WasapiLoopbackCapture();   // default output device
             _buffered = new BufferedWaveProvider(_capture.WaveFormat)
             {
                 ReadFully = false,
@@ -61,10 +61,10 @@ public sealed class MeetingListener
             var target = new WaveFormat(16000, 16, 1);                 // System.Speech: 16kHz/16-bit/mono
             _resampler = new MediaFoundationResampler(_buffered, target) { ResamplerQuality = 60 };
 
-            _speechStream = new SpeechStreamer(1 << 20);               // 1 MB de buffer
+            _speechStream = new SpeechStreamer(1 << 20);               // 1 MB buffer
 
             _engine = new SpeechRecognitionEngine();
-            _engine.LoadGrammar(new DictationGrammar());              // dictado libre
+            _engine.LoadGrammar(new DictationGrammar());              // free dictation
             _engine.SetInputToAudioStream(_speechStream,
                 new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
             _engine.SpeechRecognized += OnRecognized;
@@ -78,7 +78,7 @@ public sealed class MeetingListener
             _pump.Start();
             _engine.RecognizeAsync(RecognizeMode.Multiple);
             IsListening = true;
-            Log.Write($"🎧 capturando audio ✅ origen={_capture.WaveFormat}");
+            Log.Write($"🎧 capturing audio ✅ source={_capture.WaveFormat}");
             return true;
         }
         catch (Exception ex)
@@ -93,13 +93,13 @@ public sealed class MeetingListener
     private void OnAudio(object? sender, WaveInEventArgs e)
     {
         _buffered?.AddSamples(e.Buffer, 0, e.BytesRecorded);
-        if (++_audioBuffers == 1) Log.Write("🎧 primer buffer de audio recibido ✅");
+        if (++_audioBuffers == 1) Log.Write("🎧 first audio buffer received ✅");
     }
 
-    // Bombea audio resampleado (16kHz mono) hacia el reconocedor.
+    // Pumps resampled audio (16kHz mono) into the recognizer.
     private void PumpLoop()
     {
-        var buf = new byte[3200];   // ~100 ms a 16kHz/16-bit/mono
+        var buf = new byte[3200];   // ~100 ms at 16kHz/16-bit/mono
         while (_running)
         {
             int n = 0;
@@ -119,7 +119,7 @@ public sealed class MeetingListener
         var txt = (e.Result?.Text ?? "").Trim();
         if (txt.Length == 0) return;
         lock (_lock) { _transcript += (_transcript.Length > 0 ? " " : "") + txt; _partial = ""; }
-        Log.Write("🎧 segmento: " + (txt.Length > 60 ? txt[..60] : txt));
+        Log.Write("🎧 segment: " + (txt.Length > 60 ? txt[..60] : txt));
         SegmentRecognized?.Invoke(txt);
     }
 

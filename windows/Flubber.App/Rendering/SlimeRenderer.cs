@@ -5,7 +5,7 @@ namespace Flubber.App.Rendering;
 public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead, Wiggling, Stretching, Chasing, Dizzy, Yawning }
 public enum Expr { Normal, Sad, Sick }
 
-/// <summary>Estado de animación que consume el renderer (lo calcula PetWindow cada frame).</summary>
+/// <summary>Animation state consumed by the renderer (computed by PetWindow each frame).</summary>
 public sealed class SlimeView
 {
     public SlimeState State = SlimeState.Idle;
@@ -16,14 +16,14 @@ public sealed class SlimeView
     public int Tick;
     public int LookX, LookY;     // -1..1 / -1..2
     public bool Blink;
-    public int Facing = 1;       // 1 derecha, -1 izquierda
-    public double BodyOffsetX;   // para pasear
-    public bool Listening;       // escuchando una reunión: orejitas + ondas de sonido
+    public int Facing = 1;       // 1 right, -1 left
+    public double BodyOffsetX;   // for walking
+    public bool Listening;       // listening to a meeting: little ears + sound waves
 }
 
 /// <summary>
-/// Dibuja el slime pixel-art en una grilla 32x32 (origen abajo-izquierda, como AppKit),
-/// volteada a coordenadas de Skia. Puerto de drawSlime/drawFace/drawEgg.
+/// Draws the pixel-art slime on a 32x32 grid (origin bottom-left, like AppKit),
+/// flipped to Skia coordinates. Port of drawSlime/drawFace/drawEgg.
 /// </summary>
 public sealed class SlimeRenderer
 {
@@ -55,7 +55,7 @@ public sealed class SlimeRenderer
         if (gx < 0 || gx >= GW || gy < 0 || gy >= GH) return;
         _paint.Color = c;
         var x = _ox + gx * _px;
-        var y = _h - (gy + 1) * _px;          // voltea: gy crece hacia arriba (como AppKit)
+        var y = _h - (gy + 1) * _px;          // flip: gy grows upward (like AppKit)
         _canvas.DrawRect(x, y, _px + 0.5f, _px + 0.5f, _paint);
     }
 
@@ -99,31 +99,31 @@ public sealed class SlimeRenderer
         if (v.Listening && !ghost) DrawListening(v, (int)cx, height, footY, skin);
     }
 
-    /// <summary>Orejitas que se inclinan (twitch) + ondas de sonido que pulsan.</summary>
+    /// <summary>Little ears that twitch + pulsing sound waves.</summary>
     private void DrawListening(SlimeView v, int cx, double height, int footY, Skin skin)
     {
         var topY = footY + (int)height - 1;
-        var tw = (v.Tick / 9 % 2 == 0) ? 0 : 1;   // movimiento de la punta
+        var tw = (v.Tick / 9 % 2 == 0) ? 0 : 1;   // tip movement
 
         void Ear(int x0, int lean)
         {
             for (var oy = 0; oy < 4; oy++)
             {
                 var lx = x0 + (oy >= 2 ? lean : 0);
-                Fill(lx, topY + oy, skin.BodyDark);                                  // borde
-                Fill(lx + 1, topY + oy, oy is 1 or 2 ? Palette.Heart : skin.Body);   // interior rosita
+                Fill(lx, topY + oy, skin.BodyDark);                                  // border
+                Fill(lx + 1, topY + oy, oy is 1 or 2 ? Palette.Heart : skin.Body);   // pinkish interior
             }
         }
-        Ear(cx - 6, -tw);   // izquierda
-        Ear(cx + 4, tw);    // derecha
+        Ear(cx - 6, -tw);   // left
+        Ear(cx + 4, tw);    // right
 
-        // ondas de sonido ")))" a la derecha de la cabeza, pulsando
+        // ")))" sound waves to the right of the head, pulsing
         var wx = cx + 9;
         var wy = footY + (int)(height * 0.52);
-        var phase = v.Tick / 7 % 3;   // 1..3 ondas visibles
+        var phase = v.Tick / 7 % 3;   // 1..3 visible waves
         for (var i = 0; i <= phase; i++)
         {
-            // un arco ")" simple
+            // a simple ")" arc
             Fill(wx + i * 2, wy + 1, Palette.EyeWhite);
             Fill(wx + i * 2 + 1, wy, Palette.EyeWhite);
             Fill(wx + i * 2, wy - 1, Palette.EyeWhite);
@@ -156,13 +156,13 @@ public sealed class SlimeRenderer
             for (var ox = 0; ox < 3; ox++) Fill(ex + ox, faceY + 3, Palette.Eye);
             for (var ox = 0; ox < 2; ox++) Fill(ex + ox, faceY + 1, Palette.Eye);
         }
-        void EyeDizzy(int ex)   // espiral "x"
+        void EyeDizzy(int ex)   // "x" spiral
         {
             Fill(ex, faceY + 2, Palette.Eye); Fill(ex + 2, faceY + 2, Palette.Eye);
             Fill(ex + 1, faceY + 1, Palette.Eye); Fill(ex, faceY, Palette.Eye); Fill(ex + 2, faceY, Palette.Eye);
         }
 
-        // ojos según estado / ánimo
+        // eyes based on state / mood
         switch (v.State)
         {
             case SlimeState.Sleeping:
@@ -186,7 +186,7 @@ public sealed class SlimeRenderer
                 break;
         }
 
-        // boca
+        // mouth
         if (v.State is SlimeState.Dragging or SlimeState.Falling or SlimeState.StuckWall)
         {
             for (var oy = 0; oy < 3; oy++) for (var ox = 0; ox < 2; ox++) Fill(cx - 1 + ox, faceY - 4 + oy, Palette.Mouth);
@@ -196,11 +196,11 @@ public sealed class SlimeRenderer
             for (var ox = -2; ox <= 2; ox++) Fill(cx + ox, faceY - 3, Palette.Mouth);
             for (var ox = -1; ox <= 1; ox++) Fill(cx + ox, faceY - 4, Palette.Mouth);
         }
-        else if (v.State == SlimeState.Yawning)   // boca abierta (bostezo)
+        else if (v.State == SlimeState.Yawning)   // open mouth (yawn)
         {
             for (var oy = 0; oy < 3; oy++) for (var ox = -1; ox <= 1; ox++) Fill(cx + ox, faceY - 5 + oy, Palette.Mouth);
         }
-        else if (v.State == SlimeState.Sleeping) { /* sin boca */ }
+        else if (v.State == SlimeState.Sleeping) { /* no mouth */ }
         else if (v.Expr is Expr.Sad or Expr.Sick)
         {
             Fill(cx, faceY - 3, Palette.Mouth); Fill(cx - 1, faceY - 4, Palette.Mouth); Fill(cx + 1, faceY - 4, Palette.Mouth);
@@ -210,7 +210,7 @@ public sealed class SlimeRenderer
             Fill(cx - 1, faceY - 3, Palette.Mouth); Fill(cx, faceY - 4, Palette.Mouth); Fill(cx + 1, faceY - 3, Palette.Mouth);
         }
 
-        // mejillas felices
+        // happy cheeks
         if (!ghost && v.Expr == Expr.Normal &&
             v.State is SlimeState.Idle or SlimeState.Looking or SlimeState.Happy or SlimeState.Dancing)
         {

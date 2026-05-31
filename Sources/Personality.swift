@@ -1,7 +1,7 @@
 import Foundation
 
 // ============================================================================
-// Personality.swift — el "cerebro" del slime (sin red), bilingüe (ES/EN).
+// Personality.swift — the slime's "brain" (no network), bilingual (ES/EN).
 // ============================================================================
 
 enum Situation: String {
@@ -63,7 +63,7 @@ enum Personality {
         return lines.joined(separator: "\n")
     }
 
-    /// System prompt del modo AGENTE (chat con herramientas).
+    /// System prompt for AGENT mode (chat with tools).
     static func agentSystem(_ s: PetStats) -> String {
         let state = Loc.isES
             ? "Estado: etapa \(s.stage), hambre \(level(s.hunger)), ánimo \(level(s.happiness)), energía \(level(s.energy)), limpieza \(level(s.cleanliness)), salud \(level(s.health))\(s.isSick ? ", enfermo" : "")."

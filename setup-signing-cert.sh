@@ -1,15 +1,15 @@
 #!/bin/bash
-# Crea (una vez, en LOCAL) un certificado de firma self-signed llamado
-# "Flubber Self-Signed" y lo importa al llavero de login.
+# Creates (once, LOCALLY) a self-signed signing certificate named
+# "Flubber Self-Signed" and imports it into the login keychain.
 #
-# ¿Para qué? macOS ancla el permiso de Grabación de pantalla (TCC) a la firma de
-# la app. Con firma ad-hoc la huella cambia en cada build → el permiso se
-# reinicia. Con este cert (huella estable) la designated requirement no cambia,
-# así que el permiso PERSISTE entre rebuilds. Solo pide un "Abrir de todos modos"
-# la primera vez (no está notarizada).
+# Why? macOS anchors the Screen Recording permission (TCC) to the app's
+# signature. With ad-hoc signing the fingerprint changes on every build → the
+# permission resets. With this cert (stable fingerprint) the designated
+# requirement does not change, so the permission PERSISTS across rebuilds. It
+# only asks for an "Open Anyway" the first time (it is not notarized).
 #
-# Tras correrlo, build.sh detecta el cert y firma con él automáticamente.
-# En CI (sin el cert) build.sh cae a ad-hoc solo.
+# After running it, build.sh detects the cert and signs with it automatically.
+# In CI (without the cert) build.sh falls back to ad-hoc on its own.
 set -e
 
 CERT_NAME="Flubber Self-Signed"
@@ -44,7 +44,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 openssl pkcs12 -export -inkey "$KEY" -in "$CRT" \
   -out "$P12" -passout pass:flubber -name "$CERT_NAME" >/dev/null 2>&1
 
-# -T /usr/bin/codesign + -A => codesign puede usar la clave sin diálogos.
+# -T /usr/bin/codesign + -A => codesign can use the key without dialogs.
 security import "$P12" -k "$KEYCHAIN" -P flubber -T /usr/bin/codesign -A
 
 echo "✅ Listo. Identidad de firma:"

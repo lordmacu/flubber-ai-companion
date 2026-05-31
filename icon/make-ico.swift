@@ -1,6 +1,6 @@
-// Ensambla un .ico (Windows) con payloads PNG (formato Vista+), a partir de PNGs ya
-// renderizados. Así el icono de Windows usa EXACTAMENTE los mismos píxeles que macOS.
-// Uso: ./make-ico salida.ico 16:a.png 32:b.png 48:c.png ...
+// Assembles a .ico (Windows) with PNG payloads (Vista+ format), from already-
+// rendered PNGs. This way the Windows icon uses EXACTLY the same pixels as macOS.
+// Usage: ./make-ico output.ico 16:a.png 32:b.png 48:c.png ...
 import Foundation
 
 let args = CommandLine.arguments

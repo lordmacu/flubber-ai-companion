@@ -11,10 +11,10 @@ using Flubber.Core.Util;
 namespace Flubber.App.Platform;
 
 /// <summary>
-/// Captura de pantalla con GDI (BitBlt vía CopyFromScreen). Si <c>appHint</c> coincide
-/// con una app/ventana, captura SOLO el rect de esa ventana; si no, toda la pantalla.
-/// Equivalente a ScreenCapture.grab de macOS. La ventana de Flubber queda excluida por
-/// su display-affinity (WDA_EXCLUDEFROMCAPTURE).
+/// Screen capture with GDI (BitBlt via CopyFromScreen). If <c>appHint</c> matches
+/// an app/window, captures ONLY that window's rect; otherwise the whole screen.
+/// Equivalent to macOS's ScreenCapture.grab. The Flubber window is excluded by
+/// its display-affinity (WDA_EXCLUDEFROMCAPTURE).
 /// </summary>
 public static class ScreenCapture
 {
@@ -81,7 +81,7 @@ public static class ScreenCapture
         return (Convert.ToBase64String(bytes), bytes);
     }
 
-    /// <summary>Busca el rect de la ventana visible más al frente que coincida con el hint.</summary>
+    /// <summary>Finds the rect of the frontmost visible window matching the hint.</summary>
     private static Rectangle? FindWindowRect(string hint)
     {
         var h = hint.Trim().ToLowerInvariant();
@@ -90,7 +90,7 @@ public static class ScreenCapture
 
         Native.EnumWindows((hWnd, _) =>
         {
-            if (!Native.IsWindowVisible(hWnd) || Native.IsIconic(hWnd)) return true;   // saltar ocultas/minimizadas
+            if (!Native.IsWindowVisible(hWnd) || Native.IsIconic(hWnd)) return true;   // skip hidden/minimized
             var len = Native.GetWindowTextLength(hWnd);
             if (len == 0) return true;
             var sb = new StringBuilder(len + 1);
@@ -111,7 +111,7 @@ public static class ScreenCapture
             var match = wantBrowser
                 ? Browsers.Any(b => proc.Contains(b))
                 : proc.Contains(h) || h.Contains(proc) || titleLo.Contains(h);
-            if (match) { found = hWnd; return false; }   // EnumWindows va de frente hacia atrás
+            if (match) { found = hWnd; return false; }   // EnumWindows goes front to back
             return true;
         }, IntPtr.Zero);
 

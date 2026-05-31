@@ -2,10 +2,10 @@ import Cocoa
 import UserNotifications
 
 // ============================================================================
-// Agent.swift — el slime como AGENTE: bucle de function-calling con MiniMax y
-// el catálogo de herramientas (buscar web, leer páginas, clima, hora,
-// recordatorios, controlarse, abrir cosas, ejecutar comandos).
-// Acciones "hacia afuera" (abrir / ejecutar) piden confirmación al usuario.
+// Agent.swift — the slime as an AGENT: function-calling loop with MiniMax and
+// the tool catalog (web search, page reading, weather, time,
+// reminders, self-control, opening things, running commands).
+// "Outward" actions (open / run) ask the user for confirmation.
 // ============================================================================
 
 final class Agent {
@@ -16,8 +16,8 @@ final class Agent {
     private let maxIterations = 6
 
     var onStep: ((String) -> Void)?
-    var onToken: ((String) -> Void)?     // texto en streaming (token a token)
-    // (título, detalle, callback(aprobado, siempre)) — lo provee la UI para confirmar.
+    var onToken: ((String) -> Void)?     // streaming text (token by token)
+    // (title, detail, callback(approved, always)) — provided by the UI to confirm.
     var confirm: ((String, String, @escaping (Bool, Bool) -> Void) -> Void)?
 
     func allowed(_ cat: String) -> Bool {
@@ -36,7 +36,7 @@ final class Agent {
 
     init(view: PetView, client: AIBackend) { self.view = view; self.client = client }
 
-    // MARK: Bucle
+    // MARK: Loop
 
     func run(_ userText: String, image: String? = nil, onStep: @escaping (String) -> Void,
              onToken: @escaping (String) -> Void = { _ in }, completion: @escaping (String) -> Void) {
@@ -44,7 +44,7 @@ final class Agent {
         self.onToken = onToken
         let sys = Personality.agentSystem(view?.stats ?? PetStats())
         if messages.isEmpty { messages = [AIMessage(role: "system", content: sys)] }
-        else { messages[0] = AIMessage(role: "system", content: sys) }    // refresca estado
+        else { messages[0] = AIMessage(role: "system", content: sys) }    // refresh state
         messages.append(AIMessage(role: "user", content: userText, imageBase64: image))
         iterations = 0
         step(completion)
@@ -64,7 +64,7 @@ final class Agent {
                 completion(text.isEmpty ? "🟢" : text)
                 return
             }
-            // registrar el mensaje del asistente con sus tool_calls y ejecutarlas
+            // record the assistant message with its tool_calls and execute them
             self.messages.append(AIMessage(role: "assistant", content: result.content ?? "", toolCalls: result.toolCalls))
             self.executeAll(result.toolCalls, index: 0) { self.step(completion) }
         }
@@ -83,7 +83,7 @@ final class Agent {
         }
     }
 
-    // MARK: Despacho de herramientas
+    // MARK: Tool dispatch
 
     private func execute(_ call: ToolCall, completion: @escaping (String) -> Void) {
         let args = Agent.parseArgs(call.arguments)
@@ -98,7 +98,7 @@ final class Agent {
             let win = view?.window
             ScreenCapture.grab(appHint: appHint, excluding: win) { [weak self] b64, path in
                 guard let self = self else { return }
-                if let path = path { self.view?.attachShot(path) }      // thumbnail en el chat
+                if let path = path { self.view?.attachShot(path) }      // thumbnail in the chat
                 guard let b64 = b64 else {
                     completion("No pude ver la pantalla: activa Grabación de pantalla para Flubber en Ajustes (te lo abrí) y REINICIA la app."); return
                 }
@@ -165,7 +165,7 @@ final class Agent {
         }
     }
 
-    // MARK: Herramientas locales
+    // MARK: Local tools
 
     private func scheduleReminder(_ args: [String: Any], _ completion: @escaping (String) -> Void) {
         let texto = args["texto"] as? String ?? "recordatorio"
@@ -182,7 +182,7 @@ final class Agent {
         }
     }
 
-    private func controlSlime(_ args: [String: Any]) -> String {   // llamar siempre en el hilo principal
+    private func controlSlime(_ args: [String: Any]) -> String {   // always call on the main thread
         guard let view = view else { return "No pude controlarme." }
         let accion = (args["accion"] as? String ?? "").lowercased()
         let tema = (args["tema"] as? String ?? args["color"] as? String ?? "").lowercased()
@@ -236,7 +236,7 @@ final class Agent {
         }, { completion(Loc.t("El usuario rechazó el comando.", "User rejected the command.")) })
     }
 
-    /// Pide confirmación salvo que la categoría ya esté en "permitir siempre".
+    /// Asks for confirmation unless the category is already set to "always allow".
     private func gate(_ cat: String, _ title: String, _ detail: String, _ proceed: @escaping () -> Void, _ reject: @escaping () -> Void) {
         if allowed(cat) { proceed(); return }
         DispatchQueue.main.async {
@@ -294,7 +294,7 @@ final class Agent {
         }
     }
 
-    // MARK: Definición de herramientas (esquema OpenAI)
+    // MARK: Tool definitions (OpenAI schema)
 
     static func fn(_ name: String, _ desc: String, _ props: [String: Any], _ required: [String]) -> ToolDef {
         ToolDef(name: name, description: desc,
@@ -333,7 +333,7 @@ final class Agent {
     ]
 }
 
-// MARK: - Captura de pantalla (para que el slime "vea")
+// MARK: - Screen capture (so the slime can "see")
 
 enum ScreenCapture {
     static var shotsDir: URL {
@@ -343,14 +343,14 @@ enum ScreenCapture {
         return base
     }
 
-    /// Busca el id de la ventana frontal que coincida con `hint` (nombre de app o "navegador").
+    /// Finds the id of the frontmost window matching `hint` (app name or "browser").
     static func windowID(matching hint: String) -> CGWindowID? {
         let h = hint.lowercased()
         guard !h.isEmpty else { return nil }
         let browsers = ["safari", "chrome", "google chrome", "arc", "firefox", "edge", "microsoft edge", "brave", "opera", "vivaldi", "dia", "comet"]
         let wantBrowser = h.contains("navegad") || h.contains("browser")
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-        for w in list {   // viene de frente hacia atrás
+        for w in list {   // comes front to back
             guard (w[kCGWindowLayer as String] as? Int) == 0,
                   let owner = (w[kCGWindowOwnerName as String] as? String)?.lowercased(),
                   let num = w[kCGWindowNumber as String] as? CGWindowID, owner.lowercased() != "flubber" else { continue }
@@ -361,19 +361,19 @@ enum ScreenCapture {
         return nil
     }
 
-    /// Captura. Si `appHint` coincide con una app, captura SOLO esa ventana; si no, toda la pantalla.
-    /// No ocultamos la ventana del slime (sharingType=.none ya la excluye) → sin parpadeo.
-    /// ¿Tenemos permiso real de Grabación de pantalla? (no lo que "diga" Ajustes)
+    /// Capture. If `appHint` matches an app, captures ONLY that window; otherwise the whole screen.
+    /// We don't hide the slime's window (sharingType=.none already excludes it) → no flicker.
+    /// Do we actually have Screen Recording permission? (not what Settings "says")
     static func hasPermission() -> Bool { CGPreflightScreenCaptureAccess() }
 
     static func grab(appHint: String? = nil, excluding window: NSWindow? = nil, completion: @escaping (String?, String?) -> Void) {
-        // Verifica el permiso DE VERDAD; si falta, lo pide y abre el panel correcto.
+        // Check the permission FOR REAL; if missing, request it and open the right panel.
         let pre = CGPreflightScreenCaptureAccess()
         Log.write("📸 grab(appHint=\(appHint ?? "nil")) — CGPreflightScreenCaptureAccess=\(pre)")
         if !pre {
             DispatchQueue.main.async {
                 let granted = CGRequestScreenCaptureAccess()
-                Log.write("🔐 Sin permiso de pantalla → CGRequestScreenCaptureAccess=\(granted). Abriendo panel de Ajustes.")
+                Log.write("🔐 No screen permission → CGRequestScreenCaptureAccess=\(granted). Opening Settings panel.")
                 if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     NSWorkspace.shared.open(u)
                 }
@@ -382,7 +382,7 @@ enum ScreenCapture {
             return
         }
         let targetID = appHint.flatMap { windowID(matching: $0) }
-        Log.write("📸 Permiso OK. Capturando \(targetID != nil ? "ventana id=\(targetID!)" : "pantalla completa").")
+        Log.write("📸 Permission OK. Capturing \(targetID != nil ? "window id=\(targetID!)" : "full screen").")
         DispatchQueue.global().async {
             let path = shotsDir.appendingPathComponent(UUID().uuidString + ".jpg").path
             let p = Process()
@@ -394,7 +394,7 @@ enum ScreenCapture {
             let exists = FileManager.default.fileExists(atPath: path)
             let bytes = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? nil
             let b64 = ok ? NSImage(contentsOfFile: path).flatMap { encode($0, maxW: 1000) } : nil
-            Log.write("📸 screencapture ok=\(ok) archivo=\(exists) bytes=\(bytes ?? 0) b64=\(b64 != nil ? "sí(\(b64!.count))" : "no")")
+            Log.write("📸 screencapture ok=\(ok) file=\(exists) bytes=\(bytes ?? 0) b64=\(b64 != nil ? "yes(\(b64!.count))" : "no")")
             DispatchQueue.main.async { completion(b64, ok ? path : nil) }
         }
     }
@@ -410,12 +410,12 @@ enum ScreenCapture {
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
         rep.draw(in: NSRect(x: 0, y: 0, width: nw, height: nh))
         NSGraphicsContext.restoreGraphicsState()
-        // JPEG con compresión: payload mucho menor que PNG
+        // JPEG with compression: much smaller payload than PNG
         return out.representation(using: .jpeg, properties: [.compressionFactor: 0.55])?.base64EncodedString()
     }
 }
 
-// MARK: - Control del navegador (AppleScript: leer URL, ejecutar JS en la pestaña activa)
+// MARK: - Browser control (AppleScript: read URL, run JS in the active tab)
 
 enum BrowserTools {
     static let names = ["safari", "google chrome", "chrome", "brave browser", "brave",
@@ -423,7 +423,7 @@ enum BrowserTools {
 
     static func frontName() -> String? {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-        for w in list {   // de frente hacia atrás
+        for w in list {   // front to back
             guard (w[kCGWindowLayer as String] as? Int) == 0,
                   let owner = w[kCGWindowOwnerName as String] as? String else { continue }
             let lo = owner.lowercased()
@@ -468,7 +468,7 @@ enum BrowserTools {
     }
 }
 
-// MARK: - Herramientas de red (DuckDuckGo / fetch / clima)
+// MARK: - Network tools (DuckDuckGo / fetch / weather)
 
 enum WebTools {
     static let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -516,7 +516,7 @@ enum WebTools {
         }
     }
 
-    // --- utilidades de parseo ---
+    // --- parsing utilities ---
     static func matches(in text: String, pattern: String) -> [[String]] {
         guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
         let ns = text as NSString
@@ -536,7 +536,7 @@ enum WebTools {
     }
 
     static func decodeDDG(_ href: String) -> String {
-        // los enlaces de DDG vienen como //duckduckgo.com/l/?uddg=<url-encoded>&...
+        // DDG links come as //duckduckgo.com/l/?uddg=<url-encoded>&...
         if let r = href.range(of: "uddg=") {
             let after = String(href[r.upperBound...])
             let enc = after.components(separatedBy: "&").first ?? after

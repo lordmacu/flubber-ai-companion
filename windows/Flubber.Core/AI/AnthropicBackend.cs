@@ -4,7 +4,7 @@ using Flubber.Core.Util;
 
 namespace Flubber.Core.AI;
 
-/// <summary>Claude / Anthropic Messages API (y MiniMax, que es compatible). Puerto de AnthropicBackend.swift.</summary>
+/// <summary>Claude / Anthropic Messages API (and MiniMax, which is compatible). Port of AnthropicBackend.swift.</summary>
 public sealed class AnthropicBackend : IAIBackend
 {
     public AIConfig Config { get; set; }
@@ -27,7 +27,7 @@ public sealed class AnthropicBackend : IAIBackend
 
     private async Task<string?> PostAsync(object body, TimeSpan timeout)
     {
-        if (!IsConfigured) { Log.Write($"post: sin clave (provider={Config.Provider})"); return null; }
+        if (!IsConfigured) { Log.Write($"post: no key (provider={Config.Provider})"); return null; }
         Log.Write($"→ {(IsClaude ? "Claude" : "MiniMax")} POST {Endpoint} model={Model} keyLen={Key.Length}");
         var (status, text) = await Http.PostAsync(Endpoint, Headers(), body, timeout).ConfigureAwait(false);
         Log.Write($"← HTTP {status} {Trunc(text, 400)}");

@@ -6,8 +6,8 @@ using Flubber.Core.Tools;
 namespace Flubber.Core.Agent;
 
 /// <summary>
-/// El slime como AGENTE: bucle de function-calling + despacho de herramientas.
-/// Puerto de Agent.swift. Las herramientas del SO van por <see cref="IPlatformBridge"/>.
+/// The slime as an AGENT: function-calling loop + tool dispatch.
+/// Port of Agent.swift. OS tools go through <see cref="IPlatformBridge"/>.
 /// </summary>
 public sealed class Agent
 {
@@ -25,10 +25,10 @@ public sealed class Agent
         _platform = platform;
     }
 
-    /// <summary>¿Ya hay turnos (aparte del system)?</summary>
+    /// <summary>Are there already turns (apart from the system one)?</summary>
     public bool HasContext => _messages.Any(m => m.Role != "system");
 
-    /// <summary>Siembra turnos previos (de una conversación cargada) para dar memoria al LLM.</summary>
+    /// <summary>Seeds previous turns (from a loaded conversation) to give the LLM memory.</summary>
     public void SeedHistory(IEnumerable<(string Role, string Content)> turns)
     {
         if (HasContext) return;
@@ -39,10 +39,10 @@ public sealed class Agent
         }
     }
 
-    /// <summary>Vacía el contexto (para empezar una conversación nueva).</summary>
+    /// <summary>Clears the context (to start a new conversation).</summary>
     public void Reset() => _messages.Clear();
 
-    // MARK: permisos
+    // MARK: permissions
     private bool Allowed(string cat) => cat switch
     {
         "browser" => _client.Config.AllowBrowser == true,
@@ -61,13 +61,13 @@ public sealed class Agent
         _client.Config.Save();
     }
 
-    // MARK: bucle
+    // MARK: loop
     public async Task<string> RunAsync(string userText, string? image, Action<string> onStep, Action<string>? onToken = null)
     {
         _onStep = onStep;
         _onToken = onToken ?? (_ => { });
         var sys = new AIMessage("system", Personality.AgentSystem(_platform.Stats));
-        // garantiza el prompt de sistema en el índice 0 sin pisar turnos sembrados
+        // guarantees the system prompt at index 0 without overwriting seeded turns
         if (_messages.Count == 0 || _messages[0].Role != "system") _messages.Insert(0, sys);
         else _messages[0] = sys;
         _messages.Add(new AIMessage { Role = "user", Content = userText, ImageBase64 = image });
@@ -95,7 +95,7 @@ public sealed class Agent
         return "Uff, me enredé demasiado 😵 ¿lo intentamos de otra forma?";
     }
 
-    // MARK: despacho de herramientas
+    // MARK: tool dispatch
     private async Task<string> ExecuteAsync(ToolCall call)
     {
         var args = new ToolArgs(call.Arguments);
@@ -160,7 +160,7 @@ public sealed class Agent
         }
     }
 
-    /// <summary>Pide confirmación salvo que la categoría ya esté en "permitir siempre".</summary>
+    /// <summary>Asks for confirmation unless the category is already set to "always allow".</summary>
     private async Task<string> GateAsync(string cat, string title, string detail, Func<Task<string>> proceed)
     {
         if (Allowed(cat)) return await proceed().ConfigureAwait(false);
@@ -208,7 +208,7 @@ public sealed class Agent
     }
 }
 
-/// <summary>Lectura cómoda de los argumentos JSON de una tool call.</summary>
+/// <summary>Convenient reading of the JSON arguments of a tool call.</summary>
 internal readonly struct ToolArgs
 {
     private readonly JsonElement _root;

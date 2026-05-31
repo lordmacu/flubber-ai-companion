@@ -5,35 +5,35 @@ using Flubber.Core.Platform;
 namespace Flubber.Core;
 
 // ============================================================================
-// El "alma" Tamagotchi del slime. Puerto fiel de PetStats.swift.
-// Modelo puro (sin UI): necesidades que decaen en tiempo real, acciones de
-// cuidado, salud/enfermedad, edad/evolución, muerte y persistencia en disco.
+// The Tamagotchi "soul" of the slime. Faithful port of PetStats.swift.
+// Pure model (no UI): needs that decay in real time, care actions,
+// health/sickness, age/evolution, death and on-disk persistence.
 // ============================================================================
 
-/// <summary>Ajustes (todo tunable desde aquí).</summary>
+/// <summary>Tuning (everything tunable from here).</summary>
 public static class Tuning
 {
-    // Tasas de decaimiento POR MINUTO (de un rango 0..1). Más bajo = más lento.
+    // Decay rates PER MINUTE (of a 0..1 range). Lower = slower.
     public const double HungerDecay = 0.0035;
     public const double HappyDecay = 0.0025;
-    public const double EnergyDecay = 0.0025;   // despierto
-    public const double EnergyRegen = 0.020;    // dormido
-    public const double CleanDecayPerPoop = 0.0015; // por cada popó presente, por minuto
-    public const double HealthDecay = 0.005;    // cuando algo va mal
-    public const double HealthRegen = 0.004;    // cuando todo va bien
+    public const double EnergyDecay = 0.0025;   // awake
+    public const double EnergyRegen = 0.020;    // asleep
+    public const double CleanDecayPerPoop = 0.0015; // per poop present, per minute
+    public const double HealthDecay = 0.005;    // when something is wrong
+    public const double HealthRegen = 0.004;    // when everything is fine
 
     public const double PoopChancePerMin = 0.03;
-    public const double PoopAfterEatMin = 2.5;  // popó ~2.5 min tras comer (y no siempre)
+    public const double PoopAfterEatMin = 2.5;  // poop ~2.5 min after eating (and not always)
 
-    // Edad / evolución (en horas simuladas).
+    // Age / evolution (in simulated hours).
     public const double HatchHours = 0.05;
     public const double ChildHours = 6.0;
     public const double AdultHours = 24.0;
 
-    // Tope de decaimiento offline (segundos).
+    // Cap on offline decay (seconds).
     public const double OfflineCapSeconds = 8.0 * 3600.0;
 
-    // Multiplicador de tiempo. SLIMEPET_TIMESCALE=60 => 1s real ≈ 1min.
+    // Time multiplier. SLIMEPET_TIMESCALE=60 => 1s real ≈ 1min.
     public static readonly double TimeScale = ReadTimeScale();
     private static double ReadTimeScale()
     {
@@ -72,10 +72,10 @@ public readonly record struct PetEvent(PetEventKind Kind, int Stage = 0)
     public static PetEvent Evolved(int stage) => new(PetEventKind.Evolved, stage);
 }
 
-/// <summary>Estado del Tamagotchi (mutable; persistido en state.json).</summary>
+/// <summary>Tamagotchi state (mutable; persisted in state.json).</summary>
 public sealed class PetStats
 {
-    public double Hunger { get; set; } = 1.0;       // 0 hambriento .. 1 lleno
+    public double Hunger { get; set; } = 1.0;       // 0 hungry .. 1 full
     public double Happiness { get; set; } = 1.0;
     public double Energy { get; set; } = 1.0;
     public double Cleanliness { get; set; } = 1.0;
@@ -94,12 +94,12 @@ public sealed class PetStats
 
     [JsonIgnore] public string DisplayName => !string.IsNullOrEmpty(Name) ? Name! : "Flubber";
 
-    // Reloj interno para temporizar la popó tras comer.
+    // Internal clock to time the poop after eating.
     public double MinutesSinceFed { get; set; } = 999.0;
     public bool PendingPoopAtFed { get; set; }
 
     // ------------------------------------------------------------------
-    // Avance del tiempo. dt en SEGUNDOS reales. Devuelve eventos ocurridos.
+    // Time advance. dt in real SECONDS. Returns the events that occurred.
     // ------------------------------------------------------------------
     public List<PetEvent> Tick(double realDtSeconds)
     {
@@ -109,7 +109,7 @@ public sealed class PetStats
         var mins = (realDtSeconds * Tuning.TimeScale) / 60.0;
         if (mins <= 0) return events;
 
-        // --- Edad y evolución ---
+        // --- Age and evolution ---
         AgeHours += mins / 60.0;
         var newStage = StageFor(AgeHours);
         if ((int)newStage > (int)Stage)
@@ -120,10 +120,10 @@ public sealed class PetStats
 
         if (Stage == LifeStage.Egg) { LastUpdate = DateTime.UtcNow; return events; }
 
-        // --- Hambre ---
+        // --- Hunger ---
         Hunger = Clamp(Hunger - Tuning.HungerDecay * mins);
 
-        // --- Energía ---
+        // --- Energy ---
         if (IsAsleep)
         {
             Energy = Clamp(Energy + Tuning.EnergyRegen * mins);
@@ -135,17 +135,17 @@ public sealed class PetStats
             if (Energy <= 0.05) IsAsleep = true;
         }
 
-        // --- Felicidad ---
+        // --- Happiness ---
         var hap = Tuning.HappyDecay;
         if (Hunger <= 0.01) hap *= 2;
         if (Poops > 0) hap *= 1.0 + Poops * 0.4;
         Happiness = Clamp(Happiness - hap * mins);
 
-        // --- Limpieza ---
+        // --- Cleanliness ---
         if (Poops > 0)
             Cleanliness = Clamp(Cleanliness - Tuning.CleanDecayPerPoop * Poops * mins);
 
-        // --- Popó ---
+        // --- Poop ---
         MinutesSinceFed += mins;
         if (PendingPoopAtFed && MinutesSinceFed >= Tuning.PoopAfterEatMin)
         {
@@ -159,7 +159,7 @@ public sealed class PetStats
             events.Add(PetEvent.Pooped);
         }
 
-        // --- Salud ---
+        // --- Health ---
         var bad = Hunger <= 0.01 || Cleanliness <= 0.01 || IsSick || Poops >= 3;
         if (bad)
         {
@@ -173,7 +173,7 @@ public sealed class PetStats
                 CareScore += 0.5 * mins;
         }
 
-        // --- Enfermedad ---
+        // --- Sickness ---
         if (!IsSick && (Health < Tuning.SickHealth || Poops >= 6))
         {
             if (Random.Shared.NextDouble() < 0.06 * mins)
@@ -183,7 +183,7 @@ public sealed class PetStats
             }
         }
 
-        // --- Muerte ---
+        // --- Death ---
         if (Health <= 0.0)
         {
             IsDead = true;
@@ -204,7 +204,7 @@ public sealed class PetStats
     }
 
     // ------------------------------------------------------------------
-    // Acciones de cuidado
+    // Care actions
     // ------------------------------------------------------------------
     public void Feed(Food food)
     {
@@ -259,7 +259,7 @@ public sealed class PetStats
     }
 
     // ------------------------------------------------------------------
-    // Derivados para la UI
+    // Derived values for the UI
     // ------------------------------------------------------------------
     [JsonIgnore]
     public bool NeedsAttention =>
@@ -282,7 +282,7 @@ public sealed class PetStats
     private static double Clamp(double v) => Math.Min(1.0, Math.Max(0.0, v));
 
     // ------------------------------------------------------------------
-    // Persistencia
+    // Persistence
     // ------------------------------------------------------------------
     public static PetStats Load()
     {

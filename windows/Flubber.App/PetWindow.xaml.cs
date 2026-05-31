@@ -17,9 +17,9 @@ using Forms = System.Windows.Forms;
 namespace Flubber.App;
 
 /// <summary>
-/// Ventana de la mascota: transparente, topmost, fuera del Alt-Tab y excluible de
-/// capturas. Hospeda el render Skia + el loop de animación e implementa el puente
-/// de plataforma (IPlatformBridge) que usa el Agent.
+/// The pet window: transparent, topmost, outside the Alt-Tab list and excludable from
+/// screen captures. Hosts the Skia rendering + the animation loop and implements the
+/// platform bridge (IPlatformBridge) used by the Agent.
 /// </summary>
 public partial class PetWindow : Window, IPlatformBridge
 {
@@ -44,7 +44,7 @@ public partial class PetWindow : Window, IPlatformBridge
     private SlimeState? _transient;
     private int _transientUntil;
 
-    // movimiento / física
+    // movement / physics
     private double _targetX;
     private bool _walking;
     private double _walkSpeed = 5;
@@ -52,20 +52,20 @@ public partial class PetWindow : Window, IPlatformBridge
     private bool _falling;
     private bool _dragging;
     private double _vy;
-    private int _wallSide;           // -1 izquierda, +1 derecha, 0 ninguno
+    private int _wallSide;           // -1 left, +1 right, 0 none
     private int _nextWander = 240;
-    private long _lastDownTick;      // para detectar doble clic de forma fiable
-    private bool _chasing;           // persiguiendo el cursor
+    private long _lastDownTick;      // to detect double-click reliably
+    private bool _chasing;           // chasing the cursor
     private int _chaseUntil;
 
-    // escucha de reunión
+    // meeting listening
     private bool _listening;
     private DispatcherTimer? _meetingRollTimer;
     private int _meetingSummarizedLen;
     private readonly List<string> _meetingRollingSummaries = new();
     private DateTime _meetingStartedAt;
-    private bool _meetingConvStarted;          // la conversación dedicada ya se creó esta sesión
-    private const double MeetingThresholdSec = 60;   // ≥60s = reunión; si no, charla
+    private bool _meetingConvStarted;          // the dedicated conversation was already created this session
+    private const double MeetingThresholdSec = 60;   // ≥60s = meeting; otherwise a chat
 
     public PetWindow()
     {
@@ -91,7 +91,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _timer.Tick += OnFrame;
     }
 
-    // ---------------------------------------------------------------- ciclo de vida
+    // ---------------------------------------------------------------- lifecycle
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         var wa = SystemParameters.WorkArea;
@@ -104,7 +104,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _timer.Start();
     }
 
-    /// <summary>Botones de cuidado que aparecen al pasar el mouse (HUD).</summary>
+    /// <summary>Care buttons that appear on mouse hover (HUD).</summary>
     private void BuildHud()
     {
         Hud.Children.Clear();
@@ -143,7 +143,7 @@ public partial class PetWindow : Window, IPlatformBridge
         catch { }
     }
 
-    // ---------------------------------------------------------------- loop de animación
+    // ---------------------------------------------------------------- animation loop
     private void OnFrame(object? sender, EventArgs e)
     {
         _tick++;
@@ -161,7 +161,7 @@ public partial class PetWindow : Window, IPlatformBridge
         Surface.InvalidateVisual();
     }
 
-    /// <summary>Límites de roaming del MONITOR actual (área de trabajo), en DIP. Soporta multi-monitor y DPI mixto.</summary>
+    /// <summary>Roaming bounds of the current MONITOR (work area), in DIP. Supports multi-monitor and mixed DPI.</summary>
     private (double Left, double Right, double Ground) Bounds()
     {
         try
@@ -169,7 +169,7 @@ public partial class PetWindow : Window, IPlatformBridge
             var src = PresentationSource.FromVisual(this);
             if (src?.CompositionTarget != null)
             {
-                var wa = Forms.Screen.FromHandle(_hwnd).WorkingArea;   // px del monitor bajo la ventana
+                var wa = Forms.Screen.FromHandle(_hwnd).WorkingArea;   // px of the monitor under the window
                 var t = src.CompositionTarget.TransformFromDevice;     // device px -> DIP
                 var tl = t.Transform(new System.Windows.Point(wa.Left, wa.Top));
                 var br = t.Transform(new System.Windows.Point(wa.Right, wa.Bottom));
@@ -179,11 +179,11 @@ public partial class PetWindow : Window, IPlatformBridge
             }
         }
         catch { }
-        var p = SystemParameters.WorkArea;   // respaldo: monitor primario
+        var p = SystemParameters.WorkArea;   // fallback: primary monitor
         return (p.Left, Math.Max(p.Left, p.Right - Width), p.Bottom - Height);
     }
 
-    /// <summary>Posición del cursor en DIP (para perseguirlo en coordenadas de ventana).</summary>
+    /// <summary>Cursor position in DIP (to chase it in window coordinates).</summary>
     private System.Windows.Point CursorDip()
     {
         var (cxp, cyp) = Native.CursorPos();
@@ -195,7 +195,7 @@ public partial class PetWindow : Window, IPlatformBridge
 
     private void StartChase() { _chasing = true; _chaseUntil = _tick + 300; _walking = _rolling = false; _wallSide = 0; }
 
-    /// <summary>Mueve la ventana: pasear/rodar, caída con gravedad y escurrirse por la pared.</summary>
+    /// <summary>Moves the window: walking/rolling, falling with gravity and sliding down the wall.</summary>
     private void UpdateMovement()
     {
         if (_dragging) return;
@@ -205,20 +205,20 @@ public partial class PetWindow : Window, IPlatformBridge
         if (_stats.IsDead || _stats.Stage == LifeStage.Egg || _stats.IsAsleep)
         { _walking = _rolling = _falling = _chasing = false; _wallSide = 0; return; }
 
-        // 0) perseguir el cursor (con brinco), hasta alcanzarlo o agotar el tiempo
+        // 0) chase the cursor (with a hop), until reaching it or running out of time
         if (_chasing)
         {
             var cur = CursorDip();
             var dx = cur.X - (Left + Width / 2);
             _facing = dx >= 0 ? 1 : -1;
             Left = Math.Clamp(Left + Math.Max(-6, Math.Min(6, dx * 0.12)), leftBound, rightBound);
-            Top = ground - Math.Abs(Math.Sin(_tick * 0.4)) * 14;     // brinco
+            Top = ground - Math.Abs(Math.Sin(_tick * 0.4)) * 14;     // hop
             if (Math.Abs(dx) < 26 || _tick >= _chaseUntil)
             { _chasing = false; Top = ground; SetTransient(SlimeState.Happy, 30); }
             return;
         }
 
-        // 1) caída en el aire (tras soltar el arrastre)
+        // 1) falling through the air (after releasing the drag)
         if (_falling)
         {
             _vy += 1.4; Top += _vy;
@@ -226,7 +226,7 @@ public partial class PetWindow : Window, IPlatformBridge
             return;
         }
 
-        // 2) escurrirse por la pared hasta abajo
+        // 2) slide down the wall to the bottom
         if (_wallSide != 0)
         {
             if (Top < ground) Top = Math.Min(ground, Top + 3.0);
@@ -234,7 +234,7 @@ public partial class PetWindow : Window, IPlatformBridge
             return;
         }
 
-        // 3) paseo / rodar
+        // 3) walk / roll
         if (_walking || _rolling)
         {
             var dir = Math.Sign(_targetX - Left);
@@ -245,21 +245,21 @@ public partial class PetWindow : Window, IPlatformBridge
             return;
         }
 
-        // 4) animaciones espontáneas cada cierto tiempo (solo en reposo; quieta si escucha)
+        // 4) spontaneous animations every so often (only at rest; stays still while listening)
         if (_transient == null && !_walking && !_rolling && !_listening && _tick >= _nextWander && rightBound > leftBound)
         {
             _nextWander = _tick + _rng.Next(160, 420);
             switch (_rng.Next(0, 10))
             {
-                case 0: case 1: case 2:                                           // pasear
+                case 0: case 1: case 2:                                           // walk
                     _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound); _walking = true; break;
-                case 3: SetTransient(SlimeState.Dancing, 120); break;            // bailar
-                case 4: SetTransient(SlimeState.Wiggling, 38); break;            // contonearse
-                case 5: SetTransient(SlimeState.Wiggling, 38); break;            // contonearse
-                case 6: SetTransient(SlimeState.Stretching, 42); break;          // estirarse
-                case 7: if (_stats.Mood > 0.6) SetTransient(SlimeState.Happy, 40); break;  // brincar
-                case 8: _rolling = true; _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound); break;  // rodar
-                default: break;                                                  // a veces solo queda quieto
+                case 3: SetTransient(SlimeState.Dancing, 120); break;            // dance
+                case 4: SetTransient(SlimeState.Wiggling, 38); break;            // wiggle
+                case 5: SetTransient(SlimeState.Wiggling, 38); break;            // wiggle
+                case 6: SetTransient(SlimeState.Stretching, 42); break;          // stretch
+                case 7: if (_stats.Mood > 0.6) SetTransient(SlimeState.Happy, 40); break;  // jump
+                case 8: _rolling = true; _targetX = leftBound + _rng.NextDouble() * (rightBound - leftBound); break;  // roll
+                default: break;                                                  // sometimes just stays still
             }
         }
     }
@@ -271,7 +271,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _view.SizeScale = _stats.SizeScale;
         _view.Blink = _tick < _blinkUntil;
 
-        var sy = 1 - Math.Sin(_tick * 0.08) * 0.04;       // respiración
+        var sy = 1 - Math.Sin(_tick * 0.08) * 0.04;       // breathing
         _view.ScaleY = sy;
         _view.ScaleX = 1 / Math.Sqrt(sy);
         _view.Expr = _stats.IsSick ? Expr.Sick
@@ -293,31 +293,31 @@ public partial class PetWindow : Window, IPlatformBridge
             else _view.State = SlimeState.Idle;
         }
 
-        if (_view.State == SlimeState.StuckWall) { _view.ScaleY = 1.30; _view.ScaleX = 0.85; }   // estirado contra la pared
+        if (_view.State == SlimeState.StuckWall) { _view.ScaleY = 1.30; _view.ScaleX = 0.85; }   // stretched against the wall
 
-        // animaciones espontáneas nuevas
+        // new spontaneous animations
         _view.BodyOffsetX = 0;
         if (_view.State == SlimeState.Wiggling)
         {
-            _view.BodyOffsetX = Math.Sin(_tick * 0.6) * 3.0;          // contoneo lateral
+            _view.BodyOffsetX = Math.Sin(_tick * 0.6) * 3.0;          // sideways wiggle
             _view.ScaleX = 1 + Math.Sin(_tick * 0.6) * 0.06;
             _view.ScaleY = 1 - Math.Sin(_tick * 0.6) * 0.05;
         }
         else if (_view.State == SlimeState.Stretching)
         {
             var p = Math.Sin(Math.Clamp((double)(_tick - _transientStart) / Math.Max(1, _transientFrames), 0, 1) * Math.PI);
-            _view.ScaleY = 1 + p * 0.28;                              // se estira hacia arriba
+            _view.ScaleY = 1 + p * 0.28;                              // stretches upward
             _view.ScaleX = 1 - p * 0.18;
         }
         else if (_view.State == SlimeState.Dizzy)
         {
-            _view.ScaleX = 1.05 + Math.Sin(_tick * 0.3) * 0.03;       // tambaleo mareado
+            _view.ScaleX = 1.05 + Math.Sin(_tick * 0.3) * 0.03;       // dizzy wobble
             _view.ScaleY = 0.95;
         }
         else if (_view.State == SlimeState.Yawning)
         {
             var p = Math.Sin(Math.Clamp((double)(_tick - _transientStart) / Math.Max(1, _transientFrames), 0, 1) * Math.PI);
-            _view.ScaleY = 1 + p * 0.18;                              // se estira al bostezar
+            _view.ScaleY = 1 + p * 0.18;                              // stretches while yawning
             _view.ScaleX = 1 - p * 0.08;
         }
 
@@ -336,7 +336,7 @@ public partial class PetWindow : Window, IPlatformBridge
             double centerY = (r.Top + r.Bottom) / 2.0;
             _view.LookX = Math.Sign(cxp - centerX);
             _view.LookY = Math.Sign(cyp - centerY);
-            // el facing solo lo controla el cursor cuando NO se está moviendo
+            // facing is only controlled by the cursor when NOT moving
             if (!_walking && !_rolling && !_falling && _wallSide == 0)
             {
                 if (cxp < centerX - 20) _facing = -1; else if (cxp > centerX + 20) _facing = 1;
@@ -351,7 +351,7 @@ public partial class PetWindow : Window, IPlatformBridge
     // ---------------------------------------------------------------- input
     private void OnLeftDown(object sender, MouseButtonEventArgs e)
     {
-        // doble clic por tiempo (ClickCount no es fiable porque DragMove abre un loop modal)
+        // double-click by timing (ClickCount isn't reliable because DragMove opens a modal loop)
         var now = Environment.TickCount64;
         if (now - _lastDownTick < 300) { _lastDownTick = 0; DoPlay(); return; }
         _lastDownTick = now;
@@ -360,7 +360,7 @@ public partial class PetWindow : Window, IPlatformBridge
         try { DragMove(); } catch { }
         _dragging = false;
 
-        // al soltar: clamp dentro de la pantalla y decidir física
+        // on release: clamp inside the screen and decide physics
         var (leftBound, rightBound, ground) = Bounds();
         Left = Math.Clamp(Left, leftBound, rightBound);
         _walking = _rolling = false;
@@ -409,7 +409,7 @@ public partial class PetWindow : Window, IPlatformBridge
         try { _tray.ShowBalloonTip(4000, title, body, Forms.ToolTipIcon.None); } catch { }
     }
 
-    // ---------------------------------------------------------------- bandeja + menú
+    // ---------------------------------------------------------------- tray + menu
     private void SetupTray()
     {
         _tray = new Forms.NotifyIcon
@@ -485,7 +485,7 @@ public partial class PetWindow : Window, IPlatformBridge
         {
             _client = BackendFactory.Make(_cfg);
             _agent = new Agent(_client, this);
-            _chat?.Close();   // el chat abierto tenía el backend viejo; al reabrir usa el nuevo
+            _chat?.Close();   // the open chat had the old backend; reopening uses the new one
         }
     }
 
@@ -525,7 +525,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _chat.Activate();
     }
 
-    /// <summary>Abre el chat aunque no haya IA (para mostrar la transcripción de la reunión).</summary>
+    /// <summary>Opens the chat even when there's no AI (to show the meeting transcript).</summary>
     private void EnsureChatOpen()
     {
         if (_chat == null)
@@ -537,8 +537,8 @@ public partial class PetWindow : Window, IPlatformBridge
         _chat.Activate();
     }
 
-    /// <summary>Crea (una sola vez por sesión) la conversación dedicada, con título según
-    /// sea reunión (🎧) o charla (💬). Garantiza que cada escucha sea una conversación nueva.</summary>
+    /// <summary>Creates (once per session) the dedicated conversation, with a title depending on
+    /// whether it's a meeting (🎧) or a chat (💬). Ensures each listening session is a new conversation.</summary>
     private void EnsureMeetingConversation(bool isMeeting)
     {
         if (_meetingConvStarted) return;
@@ -550,7 +550,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _meetingConvStarted = true;
     }
 
-    // ================================================================ escucha de reunión
+    // ================================================================ meeting listening
     private void ToggleListen()
     {
         if (MeetingListener.Shared.IsListening) StopMeeting();
@@ -584,7 +584,7 @@ public partial class PetWindow : Window, IPlatformBridge
         _meetingSummarizedLen = 0;
         _meetingRollingSummaries.Clear();
         _meetingStartedAt = DateTime.UtcNow;
-        _meetingConvStarted = false;            // cada escucha es una sesión NUEVA
+        _meetingConvStarted = false;            // each listening session is a NEW session
         _meetingRollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(240) };
         _meetingRollTimer.Tick += (_, _) => _ = RollMeetingSummaryAsync();
         _meetingRollTimer.Start();
@@ -599,13 +599,13 @@ public partial class PetWindow : Window, IPlatformBridge
         _meetingRollTimer?.Stop(); _meetingRollTimer = null;
         _tray.ContextMenuStrip = BuildMenu();
         Notify("Flubber", Loc.T("Listo, déjame resumir lo que escuché… 📝", "Done, let me summarize what I heard… 📝"));
-        // espera a que el último segmento se vuelque y finaliza
+        // wait for the last segment to flush, then finish
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         t.Tick += async (_, _) => { t.Stop(); await FinishMeetingAsync(); };
         t.Start();
     }
 
-    /// <summary>Mini-resumen del trozo NUEVO de transcript (resumen rodante por lotes).</summary>
+    /// <summary>Mini-summary of the NEW chunk of transcript (rolling summary in batches).</summary>
     private async Task RollMeetingSummaryAsync()
     {
         var full = MeetingListener.Shared.Transcript;
@@ -618,27 +618,27 @@ public partial class PetWindow : Window, IPlatformBridge
             "Note in ONE short neutral sentence ONLY what is being talked about now. NO greetings, NO introducing yourself, NO emojis or opinions. Just the topic or fact. English.");
         var mini = (await _client.ChatAsync(sys, Array.Empty<(string, string)>(), newText, 220).ConfigureAwait(false) ?? "").Trim();
         if (mini.Length == 0) return;
-        Log.Write("📝 resumen parcial: " + (mini.Length > 60 ? mini[..60] : mini));
+        Log.Write("📝 partial summary: " + (mini.Length > 60 ? mini[..60] : mini));
         Dispatcher.Invoke(() =>
         {
             _meetingRollingSummaries.Add(mini);
-            EnsureMeetingConversation(isMeeting: true);   // a estas alturas (>4min) ya es reunión
+            EnsureMeetingConversation(isMeeting: true);   // by this point (>4min) it's already a meeting
             _chat?.AppendAssistant("🎧 " + mini);
             Notify("Flubber", Loc.T("🎧 anoté algo de la reunión…", "🎧 jotted down something…"));
         });
     }
 
-    /// <summary>Al parar: síntesis final en el chat (streaming) + link a la transcripción.
-    /// Se invoca desde un DispatcherTimer → corre en el hilo UI.</summary>
+    /// <summary>On stop: final synthesis in the chat (streaming) + link to the transcript.
+    /// Invoked from a DispatcherTimer → runs on the UI thread.</summary>
     private async Task FinishMeetingAsync()
     {
-        await RollMeetingSummaryAsync();   // cierra el último trozo pendiente
+        await RollMeetingSummaryAsync();   // close the last pending chunk
 
         var transcript = MeetingListener.Shared.FullText.Trim();
         var filePath = SaveTranscriptFile(transcript);
         var elapsed = (DateTime.UtcNow - _meetingStartedAt).TotalSeconds;
-        var isMeeting = elapsed >= MeetingThresholdSec;     // ≥1 min = reunión; si no, charla
-        Log.Write($"📝 finalize — {(int)elapsed}s, {(isMeeting ? "reunión" : "charla")}, transcript={transcript.Length} chars, partials={_meetingRollingSummaries.Count}");
+        var isMeeting = elapsed >= MeetingThresholdSec;     // ≥1 min = meeting; otherwise a chat
+        Log.Write($"📝 finalize — {(int)elapsed}s, {(isMeeting ? "meeting" : "chat")}, transcript={transcript.Length} chars, partials={_meetingRollingSummaries.Count}");
 
         EnsureMeetingConversation(isMeeting);
         if (transcript.Length == 0)
@@ -646,7 +646,7 @@ public partial class PetWindow : Window, IPlatformBridge
             _chat?.AppendAssistant(Loc.T("No escuché nada claro 👂", "Didn't catch anything clear 👂"));
             return;
         }
-        // Sin IA: muestra la transcripción en crudo.
+        // No AI: show the raw transcript.
         if (!_cfg.IsConfigured)
         {
             _chat?.AppendAssistant(Loc.T("🎧 Esto fue lo que escuché (sin IA para resumir):\n\n",
@@ -658,8 +658,8 @@ public partial class PetWindow : Window, IPlatformBridge
         var basis = _meetingRollingSummaries.Count > 0
             ? string.Join("\n", _meetingRollingSummaries.Select(s => "- " + s))
             : transcript;
-        // Reunión (≥1min): frase de cierre + resumen estructurado. Charla (<1min):
-        // solo un resumen corto, sin frase de cierre ni estructura.
+        // Meeting (≥1min): closing line + structured summary. Chat (<1min):
+        // just a short summary, with no closing line or structure.
         if (isMeeting)
             _chat?.AppendAssistant(Loc.T("✅ Ya terminé de escuchar. Este fue tu resumen:", "✅ Done listening. Here's your summary:"));
 
@@ -703,7 +703,7 @@ public partial class PetWindow : Window, IPlatformBridge
             System.IO.File.WriteAllText(path, header + text);
             return path;
         }
-        catch (Exception e) { Log.Write("📝 no pude guardar la transcripción: " + e.Message); return null; }
+        catch (Exception e) { Log.Write("📝 couldn't save the transcript: " + e.Message); return null; }
     }
 
     // ================================================================ IPlatformBridge
@@ -800,7 +800,7 @@ public partial class PetWindow : Window, IPlatformBridge
         return Task.FromResult((r == MessageBoxResult.Yes, false));
     });
 
-    // --- Micrófono (🎤) para el agente/chat ---
+    // --- Microphone (🎤) for the agent/chat ---
     public Task<string> StartMicAsync() => Dispatcher.Invoke(() =>
     {
         if (MicListener.Shared.Start(out var err)) { _tray.ContextMenuStrip = BuildMenu(); return Task.FromResult(Loc.T("Activé tu micrófono 🎤", "Turned on your mic 🎤")); }

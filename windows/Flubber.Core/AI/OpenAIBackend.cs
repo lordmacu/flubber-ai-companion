@@ -4,7 +4,7 @@ using Flubber.Core.Util;
 
 namespace Flubber.Core.AI;
 
-/// <summary>OpenAI (ChatGPT) y DeepSeek — formato OpenAI Chat Completions. Puerto de OpenAIBackend.swift.</summary>
+/// <summary>OpenAI (ChatGPT) and DeepSeek — OpenAI Chat Completions format. Port of OpenAIBackend.swift.</summary>
 public sealed class OpenAIBackend : IAIBackend
 {
     public AIConfig Config { get; set; }
@@ -17,7 +17,7 @@ public sealed class OpenAIBackend : IAIBackend
     private string Name => IsOpenAI ? "OpenAI" : "DeepSeek";
     private string ChatURL => Base + "/chat/completions";
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Key);
-    // OpenAI deprecó max_tokens → max_completion_tokens; DeepSeek sigue con max_tokens.
+    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek still uses max_tokens.
     private string TokenParam => IsOpenAI ? "max_completion_tokens" : "max_tokens";
 
     private IEnumerable<(string, string)> Headers() => new (string, string)[] { ("Authorization", "Bearer " + Key) };
@@ -147,7 +147,7 @@ public sealed class OpenAIBackend : IAIBackend
 
     public async Task<string?> VisionAsync(string prompt, string imageBase64)
     {
-        if (!IsConfigured || !IsOpenAI) return null;   // DeepSeek no tiene visión
+        if (!IsConfigured || !IsOpenAI) return null;   // DeepSeek has no vision
         var body = new Dictionary<string, object?>
         {
             ["model"] = Model, [TokenParam] = 1024, ["temperature"] = 0.2,

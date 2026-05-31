@@ -4,15 +4,15 @@ using Flubber.Core.Platform;
 namespace Flubber.Core;
 
 // ============================================================================
-// Varias conversaciones con el slime, persistidas. Puerto de Conversations.swift.
+// Multiple conversations with the slime, persisted. Port of Conversations.swift.
 // ============================================================================
 
 public sealed class Msg
 {
     public string Role { get; set; } = "user";   // "user" | "assistant"
     public string Content { get; set; } = "";
-    public string? ImagePath { get; set; }        // captura adjunta (thumbnail clicable)
-    public string? FilePath { get; set; }         // archivo adjunto clicable (transcripción .txt)
+    public string? ImagePath { get; set; }        // attached screenshot (clickable thumbnail)
+    public string? FilePath { get; set; }         // clickable attached file (.txt transcript)
 }
 
 public sealed class Conversation

@@ -7,7 +7,7 @@ using WpfAlign = System.Windows.HorizontalAlignment;
 
 namespace Flubber.App;
 
-/// <summary>Ventana de chat con streaming token a token + persistencia de la conversación.</summary>
+/// <summary>Chat window with token-by-token streaming + conversation persistence.</summary>
 public sealed class ChatWindow : Window
 {
     private readonly Agent _agent;
@@ -77,11 +77,11 @@ public sealed class ChatWindow : Window
             AddBubble(m.Role, m.Content);
             if (!string.IsNullOrEmpty(m.ImagePath)) AddImage(m.ImagePath!);
         }
-        _agent.SeedHistory(_conv.Messages.Select(m => (m.Role, m.Content)));   // memoria del LLM
+        _agent.SeedHistory(_conv.Messages.Select(m => (m.Role, m.Content)));   // LLM memory
         Loaded += (_, _) => _input.Focus();
     }
 
-    /// <summary>Adjunta una captura (la dibuja y la persiste en el último mensaje de usuario).</summary>
+    /// <summary>Attaches a capture (draws it and persists it on the last user message).</summary>
     public void AttachCapture(string path)
     {
         AddImage(path);
@@ -89,7 +89,7 @@ public sealed class ChatWindow : Window
         if (lastUser != null) { lastUser.ImagePath = path; _store.Save(); }
     }
 
-    /// <summary>Dibuja el thumbnail de una captura (sin persistir).</summary>
+    /// <summary>Draws the thumbnail of a capture (without persisting).</summary>
     private void AddImage(string path)
     {
         try
@@ -140,9 +140,9 @@ public sealed class ChatWindow : Window
         return tb;
     }
 
-    // ---- API para la escucha de reunión (se llama desde PetWindow, en el hilo UI) ----
+    // ---- API for meeting listening (called from PetWindow, on the UI thread) ----
 
-    /// <summary>Empieza una conversación NUEVA con un título dado (para cada reunión/charla).</summary>
+    /// <summary>Starts a NEW conversation with a given title (for each meeting/chat).</summary>
     public void StartConversation(string title)
     {
         _conv = Conversation.New();
@@ -154,7 +154,7 @@ public sealed class ChatWindow : Window
         _status.Text = "";
     }
 
-    /// <summary>Añade un mensaje del slime y lo persiste.</summary>
+    /// <summary>Adds a message from the slime and persists it.</summary>
     public void AppendAssistant(string text)
     {
         AddBubble("assistant", text);
@@ -162,7 +162,7 @@ public sealed class ChatWindow : Window
         _store.Save();
     }
 
-    /// <summary>Añade una burbuja clicable que abre un archivo (la transcripción) y la persiste.</summary>
+    /// <summary>Adds a clickable bubble that opens a file (the transcript) and persists it.</summary>
     public void AppendFileLink(string label, string filePath)
     {
         var tb = new Controls.TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = Media.Brushes.Black, FontWeight = FontWeights.SemiBold };
@@ -190,13 +190,13 @@ public sealed class ChatWindow : Window
         _store.Save();
     }
 
-    /// <summary>Crea una burbuja vacía del slime para ir llenándola en streaming.</summary>
+    /// <summary>Creates an empty slime bubble to fill in via streaming.</summary>
     public Controls.TextBlock BeginStreamingAssistant() => AddBubble("assistant", "");
 
-    /// <summary>Actualiza el texto de la burbuja en streaming (sin persistir aún).</summary>
+    /// <summary>Updates the text of the streaming bubble (without persisting yet).</summary>
     public void UpdateStreaming(Controls.TextBlock tb, string text) { tb.Text = text; _scroll.ScrollToEnd(); }
 
-    /// <summary>Fija el texto final de la burbuja en streaming y lo persiste.</summary>
+    /// <summary>Sets the final text of the streaming bubble and persists it.</summary>
     public void CommitStreaming(Controls.TextBlock tb, string finalText)
     {
         tb.Text = finalText;
@@ -228,7 +228,7 @@ public sealed class ChatWindow : Window
                     assistant.Text = streamed;
                     _scroll.ScrollToEnd();
                 }));
-            assistant.Text = reply;                       // texto final ya limpio
+            assistant.Text = reply;                       // final text, already cleaned up
             _conv.Messages.Add(new Msg { Role = "assistant", Content = reply });
             _store.Save();
         }

@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-// MARK: - Log a archivo (~/Library/Application Support/SlimePet/slimepet.log)
+// MARK: - Log to file (~/Library/Application Support/SlimePet/slimepet.log)
 
 enum Log {
     static var url: URL {
@@ -23,13 +23,13 @@ enum Log {
 }
 
 // ============================================================================
-// MiniMax.swift — configuración + cliente de red (LLM chat).
-// La CLAVE API se guarda en el Keychain de macOS (cifrado por el sistema).
-// Los ajustes no sensibles (modelo, URL, skin) van en config.json.
-// Las llamadas usan callbacks en el hilo principal, sin bloquear la animación.
+// MiniMax.swift — configuration + network client (LLM chat).
+// The API KEY is stored in the macOS Keychain (encrypted by the system).
+// Non-sensitive settings (model, URL, skin) go in config.json.
+// Calls use callbacks on the main thread, without blocking the animation.
 // ============================================================================
 
-// MARK: - Keychain (lugar seguro para la clave)
+// MARK: - Keychain (safe place for the key)
 
 enum Keychain {
     static let service = "co.cristiangarcia.slimepet"
@@ -72,7 +72,7 @@ enum Keychain {
     }
 }
 
-// MARK: - Skin serializable (para persistir el skin generado por IA)
+// MARK: - Serializable skin (to persist the AI-generated skin)
 
 struct SkinSpec: Codable {
     var name: String
@@ -82,7 +82,7 @@ struct SkinSpec: Codable {
     var shine: String
 }
 
-// MARK: - Configuración
+// MARK: - Configuration
 
 struct AIConfig: Codable {
     var provider: String = "minimax"          // "minimax" | "claude"
@@ -92,22 +92,22 @@ struct AIConfig: Codable {
     var baseURL: String = "https://api.minimax.io/v1"
     // Claude (Anthropic)
     var claudeKey: String? = nil
-    var claudeModel: String? = nil            // p.ej. "claude-sonnet-4-6"
+    var claudeModel: String? = nil            // e.g. "claude-sonnet-4-6"
     // OpenAI (ChatGPT)
     var openaiKey: String? = nil
     var openaiModel: String? = nil
     // DeepSeek
     var deepseekKey: String? = nil
     var deepseekModel: String? = nil
-    var lang: String? = nil                   // nil=sistema, "es", "en"
-    // "permitir siempre" por categoría (no volver a preguntar)
+    var lang: String? = nil                   // nil=system, "es", "en"
+    // "always allow" per category (don't ask again)
     var allowBrowser: Bool? = nil
     var allowCommand: Bool? = nil
     var allowOpen: Bool? = nil
-    // Ocultar la ventana de Flubber en capturas / grabaciones / compartir pantalla.
-    // Habilitado por defecto (nil => true) para mantener la privacidad.
+    // Hide Flubber's window in screenshots / recordings / screen sharing.
+    // Enabled by default (nil => true) to preserve privacy.
     var hideFromCapture: Bool? = nil
-    // común
+    // common
     var customSkin: SkinSpec? = nil
 
     var hideFromCaptureValue: Bool { hideFromCapture ?? true }
@@ -143,7 +143,7 @@ struct AIConfig: Codable {
            let decoded = try? JSONDecoder().decode(AIConfig.self, from: data) {
             c = decoded
         }
-        // migración: si quedó una clave del Keychain de versiones anteriores, úsala
+        // migration: if a key remained in the Keychain from older versions, use it
         if c.apiKey.isEmpty, let legacy = Keychain.get(), !legacy.isEmpty {
             c.apiKey = legacy
             c.save()
@@ -152,7 +152,7 @@ struct AIConfig: Codable {
         return c
     }
 
-    /// Guarda en un archivo local protegido (solo el usuario puede leerlo).
+    /// Saves to a protected local file (only the user can read it).
     func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
         try? data.write(to: AIConfig.fileURL)
@@ -160,22 +160,22 @@ struct AIConfig: Codable {
     }
 }
 
-// MARK: - Tipos para function calling
+// MARK: - Types for function calling
 
 struct ToolCall { let id: String; let name: String; let arguments: String }
 struct LLMResult { let content: String?; let toolCalls: [ToolCall] }
 struct ToolDef { let name: String; let description: String; let parameters: [String: Any] }
 
-/// Mensaje normalizado, independiente del proveedor.
+/// Normalized, provider-independent message.
 struct AIMessage {
     var role: String                 // system | user | assistant | tool
     var content: String
-    var toolCalls: [ToolCall] = []   // para assistant
-    var toolCallId: String? = nil    // para tool (resultado)
-    var imageBase64: String? = nil   // captura de pantalla adjunta (PNG base64), para user
+    var toolCalls: [ToolCall] = []   // for assistant
+    var toolCallId: String? = nil    // for tool (result)
+    var imageBase64: String? = nil   // attached screenshot (PNG base64), for user
 }
 
-// MARK: - Backend (protocolo común a MiniMax y Claude)
+// MARK: - Backend (protocol shared by MiniMax and Claude)
 
 protocol AIBackend: AnyObject {
     var config: AIConfig { get set }
@@ -188,9 +188,9 @@ protocol AIBackend: AnyObject {
     func test(completion: @escaping (Bool, String) -> Void)
 }
 
-// Enruta al backend según el proveedor:
-//  - claude / minimax → formato Anthropic Messages
-//  - openai / deepseek → formato OpenAI Chat Completions
+// Routes to the backend based on the provider:
+//  - claude / minimax → Anthropic Messages format
+//  - openai / deepseek → OpenAI Chat Completions format
 func makeBackend(_ config: AIConfig) -> AIBackend {
     switch config.provider {
     case "openai", "deepseek": return OpenAIBackend(config: config)
@@ -198,7 +198,7 @@ func makeBackend(_ config: AIConfig) -> AIBackend {
     }
 }
 
-// MARK: - Parser SSE para streaming real (formato Anthropic Messages)
+// MARK: - SSE parser for real streaming (Anthropic Messages format)
 
 final class StreamSession: NSObject, URLSessionDataDelegate {
     private var buffer = Data()
@@ -290,7 +290,7 @@ final class OpenAIBackend: AIBackend {
     var name: String { isOpenAI ? "OpenAI" : "DeepSeek" }
     var chatURL: String { base + "/chat/completions" }
     var isConfigured: Bool { !key.trimmingCharacters(in: .whitespaces).isEmpty }
-    // OpenAI deprecó max_tokens → max_completion_tokens; DeepSeek sigue con max_tokens.
+    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek still uses max_tokens.
     var tokenParam: String { isOpenAI ? "max_completion_tokens" : "max_tokens" }
 
     private func makeRequest(_ body: [String: Any], timeout: TimeInterval) -> URLRequest? {
@@ -367,7 +367,7 @@ final class OpenAIBackend: AIBackend {
     }
     func vision(prompt: String, imageBase64: String, completion: @escaping (String?) -> Void) {
         func done(_ s: String?) { DispatchQueue.main.async { completion(s) } }
-        guard isConfigured, isOpenAI else { done(nil); return }   // DeepSeek no tiene visión
+        guard isConfigured, isOpenAI else { done(nil); return }   // DeepSeek has no vision
         let b: [String: Any] = ["model": model, tokenParam: 1024, "temperature": 0.2, "messages": [[
             "role": "user", "content": [
                 ["type": "text", "text": prompt],
@@ -415,7 +415,7 @@ final class OpenAIBackend: AIBackend {
     }
 }
 
-// MARK: - Parser SSE para OpenAI / DeepSeek
+// MARK: - SSE parser for OpenAI / DeepSeek
 
 final class OpenAIStreamSession: NSObject, URLSessionDataDelegate {
     private var buffer = Data()
@@ -499,7 +499,7 @@ final class AnthropicBackend: AIBackend {
     private func post(_ body: [String: Any], timeout: TimeInterval, completion: @escaping (Data?) -> Void) {
         guard isConfigured, let url = URL(string: endpoint),
               let payload = try? JSONSerialization.data(withJSONObject: body) else {
-            Log.write("post: sin clave o config inválida (provider=\(config.provider))"); completion(nil); return
+            Log.write("post: no key or invalid config (provider=\(config.provider))"); completion(nil); return
         }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
@@ -528,7 +528,7 @@ final class AnthropicBackend: AIBackend {
         }
     }
 
-    /// Construye el body Anthropic (mensajes, system, tools, temperatura).
+    /// Builds the Anthropic body (messages, system, tools, temperature).
     private func anthropicBody(_ messages: [AIMessage], _ tools: [ToolDef]?, _ maxTokens: Int, stream: Bool) -> [String: Any] {
         var system = ""
         var msgs: [[String: Any]] = []
@@ -587,7 +587,7 @@ final class AnthropicBackend: AIBackend {
         StreamSession(onDelta: onDelta, onDone: completion).start(req)
     }
 
-    /// Visión: Claude usa la Messages API con imagen; MiniMax usa /v1/coding_plan/vlm.
+    /// Vision: Claude uses the Messages API with an image; MiniMax uses /v1/coding_plan/vlm.
     func vision(prompt: String, imageBase64: String, completion: @escaping (String?) -> Void) {
         func done(_ s: String?) { DispatchQueue.main.async { completion(s) } }
         guard isConfigured else { done(nil); return }
@@ -619,7 +619,7 @@ final class AnthropicBackend: AIBackend {
         }.resume()
     }
 
-    /// Búsqueda web: MiniMax usa /v1/coding_plan/search; Claude cae a DuckDuckGo.
+    /// Web search: MiniMax uses /v1/coding_plan/search; Claude falls back to DuckDuckGo.
     func webSearch(_ query: String, completion: @escaping (String) -> Void) {
         func done(_ s: String) { DispatchQueue.main.async { completion(s) } }
         if isClaude { WebTools.search(query) { done($0) }; return }
@@ -644,7 +644,7 @@ final class AnthropicBackend: AIBackend {
                 }
                 done(out)
             } else {
-                WebTools.search(query) { done($0) }   // respaldo
+                WebTools.search(query) { done($0) }   // fallback
             }
         }.resume()
     }

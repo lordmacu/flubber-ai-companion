@@ -3,9 +3,9 @@ using System.IO;
 namespace Flubber.App.Platform;
 
 /// <summary>
-/// Stream circular bloqueante: el hilo de audio ESCRIBE PCM (16kHz/16-bit/mono) y
-/// el motor de System.Speech LEE de aquí. Read() se bloquea hasta que hay datos;
-/// al cerrar, Read devuelve 0 (fin de stream) para que el reconocedor termine.
+/// Blocking circular stream: the audio thread WRITES PCM (16kHz/16-bit/mono) and
+/// the System.Speech engine READS from here. Read() blocks until data is available;
+/// on close, Read returns 0 (end of stream) so the recognizer finishes.
 /// </summary>
 public sealed class SpeechStreamer : Stream
 {

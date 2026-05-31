@@ -5,21 +5,21 @@ using Flubber.Core.Util;
 
 namespace Flubber.Core.AI;
 
-/// <summary>Cliente HTTP compartido + utilidades JSON/SSE para los backends.</summary>
+/// <summary>Shared HTTP client + JSON/SSE utilities for the backends.</summary>
 internal static class Http
 {
     public static readonly HttpClient Client = CreateClient();
 
     private static HttpClient CreateClient()
     {
-        var c = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };  // timeout por petición vía CTS
+        var c = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };  // per-request timeout via CTS
         return c;
     }
 
     public static StringContent JsonBody(object body) =>
         new(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
-    /// <summary>POST simple. Devuelve (status, body). body vacío en error de red.</summary>
+    /// <summary>Simple POST. Returns (status, body). Empty body on network error.</summary>
     public static async Task<(int Status, string Body)> PostAsync(
         string url, IEnumerable<(string, string)> headers, object body, TimeSpan timeout)
     {
@@ -39,7 +39,7 @@ internal static class Http
         }
     }
 
-    /// <summary>GET texto (con User-Agent). null en error.</summary>
+    /// <summary>GET text (with User-Agent). null on error.</summary>
     public static async Task<string?> GetAsync(string url, string userAgent, TimeSpan timeout)
     {
         using var cts = new CancellationTokenSource(timeout);
@@ -53,7 +53,7 @@ internal static class Http
         catch { return null; }
     }
 
-    /// <summary>POST con respuesta en streaming SSE: invoca onLine por cada línea (sin el \n).</summary>
+    /// <summary>POST with SSE streaming response: invokes onLine for each line (without the \n).</summary>
     public static async Task StreamPostAsync(
         string url, IEnumerable<(string, string)> headers, object body, TimeSpan timeout, Action<string> onLine)
     {
@@ -75,7 +75,7 @@ internal static class Http
     }
 }
 
-/// <summary>Helpers de serialización (equivalentes a jsonString/jsonObject de Swift).</summary>
+/// <summary>Serialization helpers (equivalent to Swift's jsonString/jsonObject).</summary>
 internal static class Json
 {
     public static string Stringify(object obj)

@@ -1,6 +1,6 @@
 namespace Flubber.Core.AI;
 
-/// <summary>Backend de IA (común a MiniMax/Claude y OpenAI/DeepSeek). Puerto async de AIBackend.</summary>
+/// <summary>AI backend (common to MiniMax/Claude and OpenAI/DeepSeek). Async port of AIBackend.</summary>
 public interface IAIBackend
 {
     AIConfig Config { get; set; }
@@ -16,7 +16,7 @@ public interface IAIBackend
 
 public static class BackendFactory
 {
-    // claude/minimax → formato Anthropic Messages; openai/deepseek → OpenAI Chat Completions.
+    // claude/minimax → Anthropic Messages format; openai/deepseek → OpenAI Chat Completions.
     public static IAIBackend Make(AIConfig config) => config.Provider switch
     {
         "openai" or "deepseek" => new OpenAIBackend(config),

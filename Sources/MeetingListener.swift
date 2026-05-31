@@ -4,15 +4,15 @@ import Speech
 import ScreenCaptureKit
 
 // ============================================================================
-// MeetingListener — transcribe ON-DEVICE (Speech.framework) dos fuentes de audio
-// INDEPENDIENTES que comparten un mismo reconocedor:
-//   • 👂 audio del SISTEMA (lo que oyes en Meet/Teams/Zoom) vía ScreenCaptureKit.
-//   • 🎤 MICRÓFONO (tu voz) vía AVAudioEngine.
-// Cada una se enciende/apaga por separado. El transcript acumulado lo resume el agente.
+// MeetingListener — transcribes ON-DEVICE (Speech.framework) two INDEPENDENT
+// audio sources that share a single recognizer:
+//   • 👂 SYSTEM audio (what you hear in Meet/Teams/Zoom) via ScreenCaptureKit.
+//   • 🎤 MICROPHONE (your voice) via AVAudioEngine.
+// Each one toggles on/off separately. The agent summarizes the accumulated transcript.
 // macOS 13+.
 //
-// Nota legal: grabar/transcribir una reunión puede requerir el consentimiento de
-// los participantes. La UI debe advertirlo; la responsabilidad es del usuario.
+// Legal note: recording/transcribing a meeting may require the participants'
+// consent. The UI should warn about it; the responsibility is the user's.
 // ============================================================================
 
 @available(macOS 13.0, *)
@@ -20,20 +20,20 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
 
     static let shared = MeetingListener()
 
-    // Estado por fuente (los dos iconos los reflejan).
-    private(set) var systemOn = false      // 👂 audio del sistema
-    private(set) var micOn = false         // 🎤 micrófono
+    // State per source (the two icons reflect them).
+    private(set) var systemOn = false      // 👂 system audio
+    private(set) var micOn = false         // 🎤 microphone
 
     private(set) var transcript = ""
     private var partial = ""
 
-    /// Compat: "isListening" = la escucha del SISTEMA (👂 / la reunión). El mic es aparte.
+    /// Compat: "isListening" = the SYSTEM listening (👂 / the meeting). The mic is separate.
     var isListening: Bool { systemOn }
 
-    /// Alias de compatibilidad para el flujo de reunión existente (= audio del sistema).
+    /// Compatibility alias for the existing meeting flow (= system audio).
     func start(completion: @escaping (Bool, String?) -> Void) { startSystem(completion: completion) }
 
-    // Pipeline de reconocimiento (compartido por ambas fuentes).
+    // Recognition pipeline (shared by both sources).
     private var pipelineActive = false
     private let appendLock = NSLock()
     private var recognizer: SFSpeechRecognizer?
@@ -41,28 +41,28 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
     private var task: SFSpeechRecognitionTask?
     private var rotateTimer: Timer?
 
-    // Fuente: sistema (ScreenCaptureKit).
+    // Source: system (ScreenCaptureKit).
     private var stream: SCStream?
     private let audioQueue = DispatchQueue(label: "co.cristiangarcia.flubber.audio")
     private var sysConverter: AVAudioConverter?
 
-    // Fuente: micrófono (AVAudioEngine).
+    // Source: microphone (AVAudioEngine).
     private var engine: AVAudioEngine?
     private var micConverter: AVAudioConverter?
 
-    // El reconocedor quiere mono/16kHz; ambas fuentes se convierten a este formato.
+    // The recognizer wants mono/16kHz; both sources are converted to this format.
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                              sampleRate: 16_000, channels: 1, interleaved: false)!
 
-    /// Texto completo (segmentos finales + lo que se está reconociendo ahora).
+    /// Full text (final segments + what's being recognized right now).
     var fullText: String {
         let p = partial.trimmingCharacters(in: .whitespacesAndNewlines)
         return (transcript + (p.isEmpty ? "" : p)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // MARK: - Pipeline de reconocimiento
+    // MARK: - Recognition pipeline
 
-    /// Pide permiso de Speech y arranca el reconocedor si no estaba activo.
+    /// Requests Speech permission and starts the recognizer if it wasn't active.
     private func ensurePipeline(_ completion: @escaping (Bool, String?) -> Void) {
         if pipelineActive { completion(true, nil); return }
         SFSpeechRecognizer.requestAuthorization { status in
@@ -112,7 +112,7 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
                     self.partial = ""
                 }
             }
-            if error != nil, self.pipelineActive { self.startChunk() }   // expiró → reanuda
+            if error != nil, self.pipelineActive { self.startChunk() }   // expired → resume
         }
     }
 
@@ -126,7 +126,7 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
         appendLock.lock(); request?.append(buf); appendLock.unlock()
     }
 
-    /// Convierte un buffer a 16kHz mono (un convertidor por fuente para no recrearlo).
+    /// Converts a buffer to 16kHz mono (one converter per source to avoid recreating it).
     private func convert(_ input: AVAudioPCMBuffer, _ conv: inout AVAudioConverter?) -> AVAudioPCMBuffer? {
         if conv == nil || conv?.inputFormat != input.format { conv = AVAudioConverter(from: input.format, to: targetFormat) }
         guard let c = conv else { return nil }
@@ -142,7 +142,7 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
         return (err == nil && out.frameLength > 0) ? out : nil
     }
 
-    // MARK: - 👂 Fuente: audio del sistema (ScreenCaptureKit)
+    // MARK: - 👂 Source: system audio (ScreenCaptureKit)
 
     func startSystem(completion: @escaping (Bool, String?) -> Void) {
         guard !systemOn else { completion(true, nil); return }
@@ -172,10 +172,10 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
             try await s.startCapture()
             self.stream = s
             self.systemOn = true
-            Log.write("🎧 sistema ON (48kHz/2ch)")
+            Log.write("🎧 system ON (48kHz/2ch)")
             completion(true, nil)
         } catch {
-            Log.write("🎧 ERROR sistema: \(error.localizedDescription)")
+            Log.write("🎧 ERROR system: \(error.localizedDescription)")
             teardownIfIdle()
             completion(false, Loc.t("No pude capturar el audio del sistema: ", "Couldn't capture system audio: ") + error.localizedDescription)
         }
@@ -200,7 +200,7 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
         DispatchQueue.main.async { self.stopSystem() }
     }
 
-    // MARK: - 🎤 Fuente: micrófono (AVAudioEngine)
+    // MARK: - 🎤 Source: microphone (AVAudioEngine)
 
     func startMic(completion: @escaping (Bool, String?) -> Void) {
         guard !micOn else { completion(true, nil); return }
@@ -224,10 +224,10 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
                         try engine.start()
                         self.engine = engine
                         self.micOn = true
-                        Log.write("🎤 micrófono ON (\(Int(fmt.sampleRate))Hz ch=\(fmt.channelCount))")
+                        Log.write("🎤 microphone ON (\(Int(fmt.sampleRate))Hz ch=\(fmt.channelCount))")
                         completion(true, nil)
                     } catch {
-                        Log.write("🎤 ERROR micrófono: \(error.localizedDescription)")
+                        Log.write("🎤 ERROR microphone: \(error.localizedDescription)")
                         self.teardownIfIdle()
                         completion(false, Loc.t("No pude abrir el micrófono: ", "Couldn't open the mic: ") + error.localizedDescription)
                     }
@@ -245,9 +245,9 @@ final class MeetingListener: NSObject, SCStreamDelegate, SCStreamOutput {
         teardownIfIdle()
     }
 
-    // MARK: - Compat / utilidades
+    // MARK: - Compat / utilities
 
-    func stop() { stopSystem(); stopMic() }          // apaga todo
+    func stop() { stopSystem(); stopMic() }          // turns everything off
 
     static func pcmBuffer(from sampleBuffer: CMSampleBuffer) -> AVAudioPCMBuffer? {
         guard let fmtDesc = CMSampleBufferGetFormatDescription(sampleBuffer),

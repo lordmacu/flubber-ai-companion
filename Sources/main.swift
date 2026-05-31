@@ -3,32 +3,32 @@ import UserNotifications
 import ServiceManagement
 
 // ============================================================================
-// SlimePet — mascota slime pixel-art + Tamagotchi para macOS.
-// Arte 100% por código. Tiene necesidades (hambre, felicidad, energía,
-// limpieza, salud) que decaen en tiempo real; come, juega, se baña, toma
-// medicina, duerme, hace popó, crece (huevo→bebé→niño→adulto), enferma y
-// puede morir. HUD de barras + botones flotantes al pasar el mouse.
+// SlimePet — pixel-art slime pet + Tamagotchi for macOS.
+// 100% code-drawn art. It has needs (hunger, happiness, energy,
+// cleanliness, health) that decay in real time; it eats, plays, bathes, takes
+// medicine, sleeps, poops, grows (egg→baby→child→adult), gets sick and
+// can die. Stat bars HUD + floating buttons on mouse hover.
 // ============================================================================
 
-// MARK: - Paleta de color
+// MARK: - Color palette
 
 struct Skin { let body, bodyDark, bodyLight, shine: NSColor }
 
 enum Pal {
     static var skins: [Skin] = [
-        Skin(body:      NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 1),  // verde
+        Skin(body:      NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 1),  // green
              bodyDark:  NSColor(srgbRed: 0.20, green: 0.62, blue: 0.40, alpha: 1),
              bodyLight: NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1),
              shine:     NSColor(srgbRed: 0.92, green: 1.00, blue: 0.95, alpha: 1)),
-        Skin(body:      NSColor(srgbRed: 0.42, green: 0.66, blue: 0.98, alpha: 1),  // azul
+        Skin(body:      NSColor(srgbRed: 0.42, green: 0.66, blue: 0.98, alpha: 1),  // blue
              bodyDark:  NSColor(srgbRed: 0.24, green: 0.42, blue: 0.78, alpha: 1),
              bodyLight: NSColor(srgbRed: 0.68, green: 0.84, blue: 1.00, alpha: 1),
              shine:     NSColor(srgbRed: 0.94, green: 0.98, blue: 1.00, alpha: 1)),
-        Skin(body:      NSColor(srgbRed: 0.78, green: 0.55, blue: 0.96, alpha: 1),  // morado
+        Skin(body:      NSColor(srgbRed: 0.78, green: 0.55, blue: 0.96, alpha: 1),  // purple
              bodyDark:  NSColor(srgbRed: 0.55, green: 0.34, blue: 0.74, alpha: 1),
              bodyLight: NSColor(srgbRed: 0.90, green: 0.76, blue: 1.00, alpha: 1),
              shine:     NSColor(srgbRed: 0.99, green: 0.96, blue: 1.00, alpha: 1)),
-        Skin(body:      NSColor(srgbRed: 0.99, green: 0.62, blue: 0.78, alpha: 1),  // rosa
+        Skin(body:      NSColor(srgbRed: 0.99, green: 0.62, blue: 0.78, alpha: 1),  // pink
              bodyDark:  NSColor(srgbRed: 0.85, green: 0.40, blue: 0.58, alpha: 1),
              bodyLight: NSColor(srgbRed: 1.00, green: 0.80, blue: 0.89, alpha: 1),
              shine:     NSColor(srgbRed: 1.00, green: 0.96, blue: 0.98, alpha: 1)),
@@ -36,13 +36,13 @@ enum Pal {
     static var index = 0
     static var skin: Skin { skins[min(index, skins.count - 1)] }
 
-    /// Aplica un skin generado por IA en un único "slot" (índice 4) y lo activa.
+    /// Applies an AI-generated skin into a single "slot" (index 4) and activates it.
     static func setAISkin(_ s: Skin) {
         if skins.count > 4 { skins[4] = s } else { skins.append(s) }
         index = 4
     }
 
-    /// NSColor desde hex "#RRGGBB".
+    /// NSColor from hex "#RRGGBB".
     static func color(_ hex: String) -> NSColor? {
         let h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
         guard h.count == 6, let v = UInt32(h, radix: 16) else { return nil }
@@ -79,7 +79,7 @@ enum Pal {
     static let egg1     = NSColor(srgbRed: 0.96, green: 0.93, blue: 0.84, alpha: 1)
     static let egg2     = NSColor(srgbRed: 0.85, green: 0.80, blue: 0.68, alpha: 1)
 
-    // colores de barras de stats
+    // stat bar colors
     static let barHunger = NSColor(srgbRed: 1.00, green: 0.60, blue: 0.25, alpha: 1)
     static let barHappy  = heart
     static let barEnergy = NSColor(srgbRed: 1.00, green: 0.82, blue: 0.20, alpha: 1)
@@ -87,48 +87,48 @@ enum Pal {
     static let barHealth = NSColor(srgbRed: 0.40, green: 0.85, blue: 0.50, alpha: 1)
 }
 
-// MARK: - Estados de animación
+// MARK: - Animation states
 
 enum PetState {
     case idle, looking, walking, dragging, falling, reacting
     case happy, chasing, dancing, rolling, dizzy, yawning, sleeping
-    case eating, bathing, takingMedicine    // acciones de cuidado
-    case egg, hatching, dead                 // ciclo de vida
-    case stuckWall                           // pegado a un costado, escurriéndose
-    case wiggling, stretching                // animaciones espontáneas (contoneo / estirarse)
+    case eating, bathing, takingMedicine    // care actions
+    case egg, hatching, dead                 // life cycle
+    case stuckWall                           // stuck to a side, oozing down
+    case wiggling, stretching                // spontaneous animations (wiggle / stretch)
 }
 
-// MARK: - Partículas
+// MARK: - Particles
 
 struct Particle {
     var x, y, vx, vy, life: CGFloat
-    var kind: Int   // 0 corazón,1 nota,2 estrella,3 Z,4 sudor,5 mosca,6 burbuja,7 miga,8 chispa
+    var kind: Int   // 0 heart,1 note,2 star,3 Z,4 sweat,5 fly,6 bubble,7 crumb,8 spark
 }
 
-// MARK: - Botón del HUD
+// MARK: - HUD button
 
 struct HudButton { let id: String; let icon: String; var rect: NSRect }
 
-// MARK: - Vista de la mascota
+// MARK: - Pet view
 
 final class PetView: NSView {
 
     let GW = 32, GH = 32
-    let PX: CGFloat = 4                                   // tamaño de cada pixel del slime
+    let PX: CGFloat = 4                                   // size of each slime pixel
     var slimeOX: CGFloat { (bounds.width - CGFloat(GW) * PX) / 2 }
 
-    // estado de animación
+    // animation state
     var state: PetState = .egg
     var tick = 0, stateTimer = 0, idleFrames = 0
     var facing: CGFloat = 1
 
-    // física
+    // physics
     var vx: CGFloat = 0, vy: CGFloat = 0
     var walkSpeed: CGFloat = 1.4
     var targetX: CGFloat = 0
-    var wallSide: CGFloat = 0      // -1 izquierda, +1 derecha (al escurrirse)
+    var wallSide: CGFloat = 0      // -1 left, +1 right (when oozing)
 
-    // ojos
+    // eyes
     var blinkUntil = 0
     var lookX: CGFloat = 0, lookY: CGFloat = 0
     var lookTX: CGFloat = 0, lookTY: CGFloat = 0
@@ -139,10 +139,10 @@ final class PetView: NSView {
     var mouseDownAt: NSPoint = .zero
     var didDrag = false
     var consumedByButton = false
-    var grabbedSlime = false        // el mousedown empezó sobre el cuerpo del slime
+    var grabbedSlime = false        // the mousedown started on the slime's body
     var loveClicks = 0, lastClickTick = -999
 
-    // partículas / squash
+    // particles / squash
     var particles: [Particle] = []
     var squashLanding: CGFloat = 0
     var eatingFood: Food = .meat
@@ -150,21 +150,21 @@ final class PetView: NSView {
     // Tamagotchi
     var stats = PetStats()
 
-    // IA / diálogo
+    // AI / dialogue
     var client: AIBackend?
-    var convo: [(String, String)] = []          // historial de chat (role, content)
+    var convo: [(String, String)] = []          // chat history (role, content)
     var bubbleText: String? = nil
     var bubbleUntil = Date.distantPast
     var bubbleThinking = false
     var lastSpontaneous = Date.distantPast
     var lastClickTalk = Date.distantPast
     var onChatRequested: (() -> Void)?
-    var onToggleListen: (() -> Void)?     // 👂 audio del sistema
-    var onToggleMic: (() -> Void)?        // 🎤 micrófono
-    var listening = false                 // 👂 escuchando el sistema (para el icono)
-    var micOn = false                     // 🎤 micrófono activo (para el icono)
+    var onToggleListen: (() -> Void)?     // 👂 system audio
+    var onToggleMic: (() -> Void)?        // 🎤 microphone
+    var listening = false                 // 👂 listening to the system (for the icon)
+    var micOn = false                     // 🎤 microphone active (for the icon)
 
-    // chat integrado (panel pixel sobre el slime)
+    // integrated chat (pixel panel over the slime)
     var chatActive = false
     var chatStore = ConversationStore.load()
     var convIndex = 0
@@ -172,40 +172,40 @@ final class PetView: NSView {
     var chatScroll: CGFloat = 0
     var chatBusy = false
     var listOpen = false
-    var stepLines: [String] = []        // pasos de herramienta efímeros (no se guardan)
+    var stepLines: [String] = []        // ephemeral tool steps (not saved)
     var agent: Agent?
-    var chatButtons: [HudButton] = []   // botones del panel (close/new/list)
-    var listRowRects: [NSRect] = []     // filas de la lista de conversaciones
-    var chatStick = true                // pegado al fondo (autoscroll)
-    var chatScrollToBottom = false      // al abrir/cambiar de conversación: salta al final absoluto
-    // --- escucha de reunión: resúmenes rodantes por lotes ---
-    var meetingConvId: String? = nil           // conversación dedicada (se crea al vuelo, nueva por sesión)
-    var meetingSummarizedLen = 0               // cuánto transcript ya se resumió
-    var meetingRollingSummaries: [String] = [] // mini-resúmenes acumulados
-    var meetingRollTimer: Timer?               // dispara un mini-resumen cada X tiempo
-    var meetingStartedAt = Date()              // para decidir si fue "reunión" (>1 min) o "charla"
-    static let meetingThreshold: TimeInterval = 60   // ≥60s = reunión; si no, charla
-    var chatContentH: CGFloat = 0       // alto del contenido (para clamping del scroll)
+    var chatButtons: [HudButton] = []   // panel buttons (close/new/list)
+    var listRowRects: [NSRect] = []     // rows of the conversation list
+    var chatStick = true                // stuck to the bottom (autoscroll)
+    var chatScrollToBottom = false      // on opening/switching conversation: jump to the absolute end
+    // --- meeting listening: rolling summaries in batches ---
+    var meetingConvId: String? = nil           // dedicated conversation (created on the fly, new per session)
+    var meetingSummarizedLen = 0               // how much transcript has already been summarized
+    var meetingRollingSummaries: [String] = [] // accumulated mini-summaries
+    var meetingRollTimer: Timer?               // fires a mini-summary every X time
+    var meetingStartedAt = Date()              // to decide whether it was a "meeting" (>1 min) or a "talk"
+    static let meetingThreshold: TimeInterval = 60   // ≥60s = meeting; otherwise a talk
+    var chatContentH: CGFloat = 0       // content height (for clamping the scroll)
     var chatAreaH: CGFloat = 0
-    var chatMouse: NSPoint = .zero       // posición del mouse dentro del chat (para hover)
+    var chatMouse: NSPoint = .zero       // mouse position inside the chat (for hover)
     var copyButtons: [(rect: NSRect, text: String)] = []
-    var pendingShot: String? = nil       // captura de pantalla lista para adjuntar
-    var pendingShotPath: String? = nil   // ruta del PNG de esa captura
+    var pendingShot: String? = nil       // screenshot ready to attach
+    var pendingShotPath: String? = nil   // path of that capture's PNG
     var thumbRects: [(rect: NSRect, path: String)] = []
-    var fileButtons: [(rect: NSRect, path: String)] = []   // links clicables a archivos (transcripción)
+    var fileButtons: [(rect: NSRect, path: String)] = []   // clickable links to files (transcript)
     var imgCache: [String: NSImage] = [:]
-    var attrCache: [String: NSAttributedString] = [:]   // markdown renderizado (cache)
-    var sendRect: NSRect = .zero                         // botón de enviar (flechita)
-    var detachRect: NSRect = .zero                       // chip de captura adjunta (clic = quitar)
-    var streamLive: String? = nil                        // texto que llega en streaming (token a token)
+    var attrCache: [String: NSAttributedString] = [:]   // rendered markdown (cache)
+    var sendRect: NSRect = .zero                         // send button (little arrow)
+    var detachRect: NSRect = .zero                       // attached capture chip (click = remove)
+    var streamLive: String? = nil                        // text arriving via streaming (token by token)
     var inputFont: NSFont { NSFont.systemFont(ofSize: 12) }
-    var chatActivity = 0                  // 0 pensando, 1 buscando, 2 mirando pantalla
-    var turnT: CGFloat = 0               // 0 de frente .. 1 de espaldas (mirando la pantalla)
+    var chatActivity = 0                  // 0 thinking, 1 searching, 2 looking at screen
+    var turnT: CGFloat = 0               // 0 facing front .. 1 facing away (looking at the screen)
     var lookingAtScreen: Bool { chatActive && chatBusy && chatActivity == 2 }
-    var talking: Bool { chatActive && chatBusy && !(streamLive ?? "").isEmpty }   // hablando (texto llegando)
-    var chatOpen: Bool { chatActive }   // mientras chateamos, no deambula
+    var talking: Bool { chatActive && chatBusy && !(streamLive ?? "").isEmpty }   // talking (text arriving)
+    var chatOpen: Bool { chatActive }   // while chatting, it doesn't wander
 
-    // gesto de "frotar" para lavar
+    // "scrub" gesture to wash
     var lastScrubX: CGFloat = 0
     var scrubDir = 0
     var scrubCount = 0
@@ -221,7 +221,7 @@ final class PetView: NSView {
     override var isFlipped: Bool { false }
 
     // ------------------------------------------------------------------
-    // Tracking del mouse para mostrar/ocultar el HUD
+    // Mouse tracking to show/hide the HUD
     // ------------------------------------------------------------------
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -234,7 +234,7 @@ final class PetView: NSView {
     override func mouseEntered(with event: NSEvent) { hovering = true }
     override func mouseExited(with event: NSEvent)  { hovering = false; scrubDir = 0; scrubCount = 0 }
 
-    /// Detecta el gesto de frotar (vaivén horizontal) sobre el slime → lavarlo.
+    /// Detects the scrubbing gesture (horizontal back-and-forth) over the slime → wash it.
     override func mouseMoved(with event: NSEvent) {
         if chatActive {
             chatMouse = convert(event.locationInWindow, from: nil)
@@ -248,10 +248,10 @@ final class PetView: NSView {
         guard abs(dx) > 3 else { return }
         let dir = dx > 0 ? 1 : -1
         let now = Date()
-        if scrubDir != 0 && dir != scrubDir {                 // hubo un cambio de dirección
+        if scrubDir != 0 && dir != scrubDir {                 // there was a direction change
             if now.timeIntervalSince(lastScrubTime) < 1.2 { scrubCount += 1 } else { scrubCount = 1 }
             lastScrubTime = now
-            if scrubCount >= 4 {                              // suficientes vaivenes → ¡a lavar!
+            if scrubCount >= 4 {                              // enough back-and-forths → time to wash!
                 scrubCount = 0
                 if stats.poops > 0 || stats.cleanliness < 0.99 { doClean() }
             }
@@ -260,7 +260,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // Bucle por frame. realDt = segundos reales transcurridos.
+    // Per-frame loop. realDt = real seconds elapsed.
     // ------------------------------------------------------------------
     func advance(realDt: TimeInterval) -> [PetEvent] {
         let events = stats.tick(dt: realDt)
@@ -271,13 +271,13 @@ final class PetView: NSView {
             default: break
             }
         }
-        // sincroniza el estado visual con la vida
+        // sync the visual state with the life cycle
         if stats.isDead {
             if state != .dead { enter(.dead) }
         } else if stats.stage == .egg {
             if state != .egg { enter(.egg) }
         } else if state == .egg {
-            enter(.idle)                       // por si carga directo ya nacido
+            enter(.idle)                       // in case it loads already hatched
         } else {
             if stats.isAsleep && interruptible() && state != .sleeping { enter(.sleeping) }
             if !stats.isAsleep && state == .sleeping { enter(.idle) }
@@ -299,21 +299,21 @@ final class PetView: NSView {
         ![.eating, .bathing, .takingMedicine, .hatching, .dragging, .falling, .stuckWall].contains(state)
     }
 
-    /// Rango de origin.x para que el CUERPO del slime no salga de la pantalla.
+    /// Range of origin.x so the slime's BODY doesn't go off the screen.
     func originXBounds(_ vf: NSRect) -> (CGFloat, CGFloat) {
         (vf.minX - slimeOX, vf.maxX - bounds.width + slimeOX)
     }
 
     func ambientFx() {
         guard !stats.isDead, stats.stage != .egg else { return }
-        if stats.isSick && tick % 28 == 0 { spawn(kind: 4, n: 1, at: CGPoint(x: 22, y: 20)) }   // sudor
+        if stats.isSick && tick % 28 == 0 { spawn(kind: 4, n: 1, at: CGPoint(x: 22, y: 20)) }   // sweat
         if stats.poops > 0 && stats.cleanliness < 0.6 && tick % 24 == 0 {
-            spawn(kind: 5, n: 1, at: CGPoint(x: 25, y: 3))                                       // mosca
+            spawn(kind: 5, n: 1, at: CGPoint(x: 25, y: 3))                                       // fly
         }
     }
 
     // ------------------------------------------------------------------
-    // Máquina de estados (movimiento + acciones)
+    // State machine (movement + actions)
     // ------------------------------------------------------------------
     func update() {
         guard let win = petWindow, let screen = win.screen ?? NSScreen.main else { return }
@@ -323,14 +323,14 @@ final class PetView: NSView {
         lookX += (lookTX - lookX) * 0.25
         lookY += (lookTY - lookY) * 0.25
 
-        // giro hacia la pantalla cuando la mira
+        // turn toward the screen when it looks at it
         turnT += ((lookingAtScreen ? 1 : 0) - turnT) * 0.15
 
-        // animación de "trabajando" (funciona en cualquier estado)
+        // "working" animation (works in any state)
         if chatActive && chatBusy {
-            if chatActivity == 1 {       // buscando: ojos escanean
+            if chatActivity == 1 {       // searching: eyes scan
                 if stateTimer % 10 == 0 { lookTX = CGFloat(Int.random(in: -1...1)); lookTY = CGFloat(Int.random(in: -1...1)) }
-            } else {                     // mirando/pensando: mira arriba
+            } else {                     // looking/thinking: looks up
                 lookTX = 0; lookTY = 1
             }
         }
@@ -338,7 +338,7 @@ final class PetView: NSView {
         switch state {
 
         case .egg:
-            // el huevo solo se bambolea; cerca de eclosionar tiembla más
+            // the egg just wobbles; near hatching it shakes more
             break
 
         case .hatching:
@@ -348,38 +348,38 @@ final class PetView: NSView {
             break
 
         case .eating:
-            if stateTimer % 12 == 0 { spawn(kind: 7, n: 2, at: CGPoint(x: 16, y: 11)) }  // migas
+            if stateTimer % 12 == 0 { spawn(kind: 7, n: 2, at: CGPoint(x: 16, y: 11)) }  // crumbs
             if stateTimer > 55 { enter(.idle) }
 
         case .bathing:
-            if stateTimer % 6 == 0 { spawn(kind: 6, n: 1, at: CGPoint(x: 16, y: 12)) }   // burbujas
+            if stateTimer % 6 == 0 { spawn(kind: 6, n: 1, at: CGPoint(x: 16, y: 12)) }   // bubbles
             if stateTimer > 55 { enter(.idle) }
 
         case .takingMedicine:
-            if stateTimer == 6 { spawn(kind: 8, n: 6, at: CGPoint(x: 16, y: 14)) }       // chispas
+            if stateTimer == 6 { spawn(kind: 8, n: 6, at: CGPoint(x: 16, y: 14)) }       // sparks
             if stateTimer > 40 { enter(.idle) }
 
         case .idle:
             idleFrames += 1
-            if chatActive && chatBusy {                      // animación según la acción
-                if chatActivity == 1 {                       // buscando: ojos escanean
+            if chatActive && chatBusy {                      // animation depending on the action
+                if chatActivity == 1 {                       // searching: eyes scan
                     if stateTimer % 10 == 0 { lookTX = CGFloat(Int.random(in: -1...1)); lookTY = CGFloat(Int.random(in: -1...1)) }
-                } else { lookTX = 0; lookTY = 1 }            // mirando/pensando: mira arriba
+                } else { lookTX = 0; lookTY = 1 }            // looking/thinking: looks up
             } else {
                 lookAtMouse(win)
             }
-            // si el mouse está encima, el chat abierto o está escuchando, se queda quieto y atento.
-            // Variedad de animaciones espontáneas según ánimo/energía.
+            // if the mouse is over it, the chat is open, or it's listening, it stays still and attentive.
+            // Variety of spontaneous animations depending on mood/energy.
             if stateTimer > 50 && !hovering && !chatOpen && !listening {
                 switch Int.random(in: 0..<150) {
-                case 0..<3:  if stats.energy > 0.3 { startWalking(in: screen) }      // pasear
-                case 3:      if stats.mood > 0.6 { enter(.dancing) }                 // bailar
-                case 4...6:  enter(.looking)                                         // mirar alrededor
-                case 7:      enter(.wiggling)                                        // contonearse
-                case 8:      if stats.energy < 0.55 { enter(.stretching) }           // estirarse
-                case 9:      if stats.energy > 0.4 { enter(.rolling) }               // rodar
-                case 10:     if stats.mood > 0.7 { enter(.happy) }                   // brincar contento
-                case 11:     if stats.mood > 0.5 { enter(.chasing) }                 // perseguir el cursor
+                case 0..<3:  if stats.energy > 0.3 { startWalking(in: screen) }      // wander
+                case 3:      if stats.mood > 0.6 { enter(.dancing) }                 // dance
+                case 4...6:  enter(.looking)                                         // look around
+                case 7:      enter(.wiggling)                                        // wiggle
+                case 8:      if stats.energy < 0.55 { enter(.stretching) }           // stretch
+                case 9:      if stats.energy > 0.4 { enter(.rolling) }               // roll
+                case 10:     if stats.mood > 0.7 { enter(.happy) }                   // hop happily
+                case 11:     if stats.mood > 0.5 { enter(.chasing) }                 // chase the cursor
                 default:     break
                 }
             }
@@ -394,7 +394,7 @@ final class PetView: NSView {
 
         case .walking:
             idleFrames = 0
-            if hovering || chatOpen { enter(.idle); break }   // no camina al hover o con el chat abierto
+            if hovering || chatOpen { enter(.idle); break }   // doesn't walk on hover or with the chat open
             var f = win.frame
             f.origin.x += vx
             let (minX, maxX) = originXBounds(vf)
@@ -474,20 +474,20 @@ final class PetView: NSView {
             } else { win.setFrameOrigin(f.origin) }
 
         case .stuckWall:
-            // pegado al costado; se escurre hacia abajo con viscosidad
+            // stuck to the side; oozes downward with viscosity
             idleFrames = 0
-            vy -= 0.18                                   // gravedad lenta (viscoso)
-            vy = max(vy, -3.2)                           // velocidad de escurrido limitada
+            vy -= 0.18                                   // slow gravity (viscous)
+            vy = max(vy, -3.2)                           // limited ooze speed
             var f = win.frame
             let (wminX, wmaxX) = originXBounds(vf)
-            f.origin.x = wallSide < 0 ? wminX : wmaxX    // se mantiene hugueado a la pared
+            f.origin.x = wallSide < 0 ? wminX : wmaxX    // stays hugging the wall
             f.origin.y += vy
             if f.origin.y <= floor {
                 f.origin.y = floor; win.setFrameOrigin(f.origin)
                 vy = 0; squashLanding = 0.8; wallSide = 0; enter(.idle)
             } else {
                 win.setFrameOrigin(f.origin)
-                if stateTimer % 16 == 0 { spawn(kind: 6, n: 1, at: CGPoint(x: 16, y: 4)) }  // gotita que gotea
+                if stateTimer % 16 == 0 { spawn(kind: 6, n: 1, at: CGPoint(x: 16, y: 4)) }  // dripping droplet
             }
 
         case .reacting:
@@ -506,12 +506,12 @@ final class PetView: NSView {
             if stateTimer % 26 == 0 { spawn(kind: 3, n: 1) }
 
         case .wiggling:
-            // contoneo en el sitio; ojos felices
-            if stateTimer == 4 { spawn(kind: 0, n: 1) }     // un corazoncito
+            // wiggle in place; happy eyes
+            if stateTimer == 4 { spawn(kind: 0, n: 1) }     // a little heart
             if stateTimer > 38 { enter(.idle) }
 
         case .stretching:
-            // estirarse como gato y volver
+            // stretch like a cat and come back
             if stateTimer > 42 { enter(.idle) }
         }
 
@@ -519,9 +519,9 @@ final class PetView: NSView {
     }
 
     func enter(_ s: PetState) {
-        // con el chat abierto no permitir estados que MUEVAN la ventana (mueven el diálogo)
+        // with the chat open, don't allow states that MOVE the window (they move the dialogue)
         if chatActive, [.dancing, .walking, .rolling, .chasing, .happy, .reacting, .falling].contains(s) { return }
-        // animarse despierta al slime
+        // getting active wakes the slime up
         if [.dancing, .walking, .rolling, .chasing, .happy].contains(s) { wakeUp() }
         state = s
         stateTimer = 0
@@ -558,7 +558,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // Acciones de cuidado (las llaman los botones / menú)
+    // Care actions (called by the buttons / menu)
     // ------------------------------------------------------------------
     func doFeed(_ food: Food) { wakeUp(); guard stats.stage != .egg, !stats.isDead else { return }; stats.feed(food); eatingFood = food; enter(.eating) }
     func doPlay()    { wakeUp(); guard stats.stage != .egg, !stats.isDead, !stats.isAsleep else { return }; stats.play(); enter(.happy) }
@@ -568,7 +568,7 @@ final class PetView: NSView {
     func doRestart() { stats.restart(); enter(.egg) }
 
     // ------------------------------------------------------------------
-    // Partículas
+    // Particles
     // ------------------------------------------------------------------
     func spawn(kind: Int, n: Int, at p: CGPoint? = nil) {
         let base = p ?? CGPoint(x: CGFloat(GW)/2, y: CGFloat(GH) * 0.6)
@@ -578,8 +578,8 @@ final class PetView: NSView {
                 x: base.x + CGFloat.random(in: -3...3),
                 y: base.y,
                 vx: CGFloat.random(in: -spread...spread),
-                vy: kind == 7 ? CGFloat.random(in: -0.5 ... -0.2)            // migas caen
-                    : kind == 5 ? CGFloat.random(in: -0.15...0.15)          // moscas flotan
+                vy: kind == 7 ? CGFloat.random(in: -0.5 ... -0.2)            // crumbs fall
+                    : kind == 5 ? CGFloat.random(in: -0.15...0.15)          // flies float
                     : kind == 3 ? 0.45
                     : CGFloat.random(in: 0.4...0.7),
                 life: 1.0, kind: kind))
@@ -589,7 +589,7 @@ final class PetView: NSView {
         for i in particles.indices {
             particles[i].x += particles[i].vx
             particles[i].y += particles[i].vy
-            if particles[i].kind == 5 {                                    // moscas: zigzag
+            if particles[i].kind == 5 {                                    // flies: zigzag
                 particles[i].x += sin(CGFloat(tick) * 0.4 + particles[i].y) * 0.3
                 particles[i].life -= 0.01
             } else {
@@ -600,7 +600,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // DIBUJO
+    // DRAWING
     // ------------------------------------------------------------------
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
@@ -617,10 +617,10 @@ final class PetView: NSView {
         }
         drawParticles(ctx)
         if chatActive {
-            drawChat(ctx)      // panel de conversación pixel sobre el slime
+            drawChat(ctx)      // pixel conversation panel over the slime
         } else {
-            drawBubble(ctx)    // el globo/animación nace por detrás…
-            drawHUD(ctx)       // …y los botones quedan al frente
+            drawBubble(ctx)    // the bubble/animation is drawn behind…
+            drawHUD(ctx)       // …and the buttons stay in front
         }
     }
 
@@ -635,20 +635,20 @@ final class PetView: NSView {
         case .dizzy:    sx = 1.05
         case .dragging: sx = 0.86
         case .falling:  sx = 0.88
-        case .stuckWall: sx = 0.74 + sin(CGFloat(tick)*0.3)*0.03   // aplastado contra la pared
+        case .stuckWall: sx = 0.74 + sin(CGFloat(tick)*0.3)*0.03   // squashed against the wall
         case .reacting: sx = 0.92
         case .yawning:  sx = 1 - min(1,CGFloat(stateTimer)/20)*0.12
         case .wiggling: sx = 1 + sin(CGFloat(stateTimer)*0.6)*0.06
-        case .stretching:                                    // se estira hacia arriba (se adelgaza)
+        case .stretching:                                    // stretches upward (thins out)
             let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
             sx = 1 - p*0.18
         default:        sx = 1 + sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
             switch chatActivity {
-            case 1: sx = 1 - abs(sin(CGFloat(tick)*0.32))*0.10    // buscando: rebote
-            case 2: sx = max(0.12, abs(cos(turnT * .pi)))         // mirando: se gira hacia la pantalla
-            default: sx = 1 + sin(CGFloat(tick)*0.2)*0.08         // pensando: pulsa
+            case 1: sx = 1 - abs(sin(CGFloat(tick)*0.32))*0.10    // searching: bounce
+            case 2: sx = max(0.12, abs(cos(turnT * .pi)))         // looking: turns toward the screen
+            default: sx = 1 + sin(CGFloat(tick)*0.2)*0.08         // thinking: pulses
             }
         }
         return (sx + squashLanding*0.30) * CGFloat(stats.sizeScale)
@@ -664,20 +664,20 @@ final class PetView: NSView {
         case .dizzy:    sy = 0.95
         case .dragging: sy = 1.18
         case .falling:  sy = 1.14
-        case .stuckWall: sy = 1.30                                  // estirado verticalmente al escurrir
+        case .stuckWall: sy = 1.30                                  // stretched vertically while oozing
         case .reacting: sy = 1.10
         case .yawning:  sy = 1 + min(1,CGFloat(stateTimer)/20)*0.20
         case .wiggling: sy = 1 - sin(CGFloat(stateTimer)*0.6)*0.05
-        case .stretching:                                    // se estira hacia arriba
+        case .stretching:                                    // stretches upward
             let p = sin(min(1, CGFloat(stateTimer)/42) * .pi)
             sy = 1 + p*0.28
         default:        sy = 1 - sin(CGFloat(tick)*0.08)*0.04
         }
         if chatActive && chatBusy {
             switch chatActivity {
-            case 1: sy = 1 + abs(sin(CGFloat(tick)*0.32))*0.10    // buscando: rebote
-            case 2: sy = 1.10 + sin(CGFloat(tick)*0.2)*0.05       // mirando: bobeo atento
-            default: sy = 1 - sin(CGFloat(tick)*0.2)*0.08         // pensando: pulsa
+            case 1: sy = 1 + abs(sin(CGFloat(tick)*0.32))*0.10    // searching: bounce
+            case 2: sy = 1.10 + sin(CGFloat(tick)*0.2)*0.05       // looking: attentive bobbing
+            default: sy = 1 - sin(CGFloat(tick)*0.2)*0.08         // thinking: pulses
             }
         }
         return (sy - squashLanding*0.35) * CGFloat(stats.sizeScale)
@@ -689,7 +689,7 @@ final class PetView: NSView {
         ctx.fill(CGRect(x: slimeOX + CGFloat(gx) * PX, y: CGFloat(gy) * PX, width: PX + 0.5, height: PX + 0.5))
     }
 
-    // Expresión según el ánimo (para estados tranquilos)
+    // Expression based on mood (for calm states)
     enum Expr { case normal, sad, sick }
     var expr: Expr {
         if stats.isSick { return .sick }
@@ -723,57 +723,57 @@ final class PetView: NSView {
         fill(ctx, Int(cx)-4, shineY, skin.shine); fill(ctx, Int(cx)-5, shineY, skin.shine); fill(ctx, Int(cx)-4, shineY-1, skin.shine)
 
         if lookingAtScreen && turnT > 0.5 {
-            drawBackPeek(ctx, cx: Int(cx), height: height, footY: footY)   // de espaldas, mirando la pantalla
+            drawBackPeek(ctx, cx: Int(cx), height: height, footY: footY)   // facing away, looking at the screen
         } else {
             drawFace(ctx, cx: Int(cx), height: height, footY: footY)
         }
 
-        // comida frente a la boca al comer
+        // food in front of the mouth while eating
         if state == .eating && stateTimer < 48 {
             let fy = footY + Int(height * 0.30)
             drawPattern(ctx, foodSprite(eatingFood), Int(cx) + 5, fy, eatingFood == .candy ? Pal.heart : Pal.crumb)
         }
 
-        // escuchando la reunión: orejitas que se mueven + ondas de sonido
+        // listening to the meeting: little ears that move + sound waves
         if listening { drawListening(ctx, cx: Int(cx), height: height, footY: footY) }
     }
 
-    /// Decoración de "escuchando": dos orejitas que se inclinan (twitch) y ondas
-    /// de sonido que pulsan al lado de la cabeza.
+    /// "Listening" decoration: two little ears that tilt (twitch) and sound
+    /// waves that pulse beside the head.
     func drawListening(_ ctx: CGContext, cx: Int, height: CGFloat, footY: Int) {
         let skin = stats.isSick ? Pal.sick : Pal.skin
         let topY = footY + Int(height) - 1
-        // twitch: la punta de las orejas se mueve un pelín con el tiempo
+        // twitch: the ear tips move a tiny bit over time
         let tw = (tick / 9) % 2 == 0 ? 0 : 1
 
-        // oreja de 2x4: cuerpo + interior rosita + borde oscuro, se inclina a la punta
+        // 2x4 ear: body + pink inner + dark border, leans at the tip
         func ear(_ x0: Int, _ lean: Int) {
             for oy in 0..<4 {
                 let lx = x0 + (oy >= 2 ? lean : 0)
-                fill(ctx, lx,     topY + oy, skin.bodyDark)            // borde exterior
+                fill(ctx, lx,     topY + oy, skin.bodyDark)            // outer border
                 fill(ctx, lx + 1, topY + oy, oy >= 1 && oy <= 2 ? Pal.heart : skin.body)
             }
         }
-        ear(cx - 6, -tw)     // oreja izquierda (se inclina a la izquierda)
-        ear(cx + 4,  tw)     // oreja derecha
+        ear(cx - 6, -tw)     // left ear (leans to the left)
+        ear(cx + 4,  tw)     // right ear
 
-        // ondas de sonido pulsantes a la derecha de la cabeza ")))"
+        // pulsing sound waves to the right of the head ")))"
         let wx = cx + 9
         let wy = footY + Int(height * 0.52)
-        let arc = ["1", "01", "1"]                       // un arco ")" simple
-        let phase = (tick / 7) % 3                        // cuántas ondas se ven (1..3)
+        let arc = ["1", "01", "1"]                       // a simple ")" arc
+        let phase = (tick / 7) % 3                        // how many waves are shown (1..3)
         for i in 0...phase {
             let a = 0.9 - Double(i) * 0.22
             drawPattern(ctx, arc, wx + i * 2, wy - 1, Pal.note.withAlphaComponent(max(0.25, a)))
         }
     }
 
-    /// Vista de espaldas: dos ojitos asomándose por arriba (mirando la pantalla).
+    /// Back view: two little eyes peeking over the top (looking at the screen).
     func drawBackPeek(_ ctx: CGContext, cx: Int, height: CGFloat, footY: Int) {
         let skin = stats.isSick ? Pal.sick : Pal.skin
         let topY = footY + Int(height * 0.80)
-        for dx in [-3, -2, 2, 3] { fill(ctx, cx + dx, topY, Pal.eye) }       // ojitos asomados
-        // un brillo central tenue en la "nuca"
+        for dx in [-3, -2, 2, 3] { fill(ctx, cx + dx, topY, Pal.eye) }       // peeking little eyes
+        // a faint central shine on the "back of the head"
         fill(ctx, cx, footY + Int(height * 0.6), skin.bodyLight)
         fill(ctx, cx + 1, footY + Int(height * 0.6), skin.bodyLight)
     }
@@ -800,12 +800,12 @@ final class PetView: NSView {
             fill(ctx, ex, faceY+2, Pal.eye); fill(ctx, ex+2, faceY+2, Pal.eye)
             fill(ctx, ex+1, faceY+1, Pal.eye); fill(ctx, ex, faceY, Pal.eye); fill(ctx, ex+2, faceY, Pal.eye)
         }
-        func eyeSad(_ ex: Int) {   // párpado superior + pupila abajo
+        func eyeSad(_ ex: Int) {   // upper eyelid + pupil at the bottom
             for ox in 0..<3 { fill(ctx, ex+ox, faceY+3, Pal.eye) }
             for ox in 0..<2 { fill(ctx, ex+ox, faceY+1, Pal.eye) }
         }
 
-        // ojos según estado / ánimo
+        // eyes based on state / mood
         switch state {
         case .sleeping, .yawning, .takingMedicine: eyeClosed(leftX); eyeClosed(rightX)
         case .happy, .wiggling: eyeHappy(leftX); eyeHappy(rightX)
@@ -822,10 +822,10 @@ final class PetView: NSView {
             else { eyeOpen(leftX); eyeOpen(rightX) }
         }
 
-        // boca
+        // mouth
         let openStates: [PetState] = [.reacting, .falling, .dragging, .yawning, .eating]
         if talking {
-            // boca que se abre y cierra (simula que habla)
+            // mouth that opens and closes (simulates talking)
             let open = 1 + Int((abs(sin(CGFloat(tick) * 0.7)) * 3).rounded())   // 1..4 px
             for oy in 0..<open { for ox in 0..<2 { fill(ctx, cx - 1 + ox, faceY - 3 - oy, Pal.mouth) } }
             return
@@ -837,14 +837,14 @@ final class PetView: NSView {
             for ox in -2...2 { fill(ctx, cx+ox, faceY-3, Pal.mouth) }
             for ox in -1...1 { fill(ctx, cx+ox, faceY-4, Pal.mouth) }
         } else if state == .sleeping {
-            // sin boca
+            // no mouth
         } else if expr == .sad || expr == .sick {
-            fill(ctx, cx, faceY-3, Pal.mouth); fill(ctx, cx-1, faceY-4, Pal.mouth); fill(ctx, cx+1, faceY-4, Pal.mouth)  // ∩ triste
+            fill(ctx, cx, faceY-3, Pal.mouth); fill(ctx, cx-1, faceY-4, Pal.mouth); fill(ctx, cx+1, faceY-4, Pal.mouth)  // ∩ sad
         } else {
-            fill(ctx, cx-1, faceY-3, Pal.mouth); fill(ctx, cx, faceY-4, Pal.mouth); fill(ctx, cx+1, faceY-3, Pal.mouth)  // ∪ sonrisa
+            fill(ctx, cx-1, faceY-3, Pal.mouth); fill(ctx, cx, faceY-4, Pal.mouth); fill(ctx, cx+1, faceY-3, Pal.mouth)  // ∪ smile
         }
 
-        // mejillas felices
+        // happy cheeks
         if [.idle, .looking, .walking, .happy, .dancing, .chasing].contains(state) && expr == .normal {
             fill(ctx, leftX-1, faceY-2, Pal.blush); fill(ctx, rightX+2, faceY-2, Pal.blush)
         }
@@ -858,14 +858,14 @@ final class PetView: NSView {
         }
     }
 
-    // ---- Huevo ----
+    // ---- Egg ----
     func drawEgg(_ ctx: CGContext) {
         let cx = GW/2
         let wob = (state == .hatching) ? sin(CGFloat(stateTimer)*0.9)*2.5 : sin(CGFloat(tick)*0.06)*1.0
         let chh = 11, cw = 8, baseY = 3
         for gy in 0..<(2*chh) {
             let t = (CGFloat(gy) - CGFloat(chh)) / CGFloat(chh)
-            let w = CGFloat(cw) * sqrt(max(0, 1 - t*t)) * (gy < chh ? 1.05 : 0.92) // un poco de "huevo"
+            let w = CGFloat(cw) * sqrt(max(0, 1 - t*t)) * (gy < chh ? 1.05 : 0.92) // a bit of "egg" shape
             let xw = Int(w.rounded())
             for dx in -xw...xw {
                 let gx = cx + dx + Int(wob)
@@ -873,11 +873,11 @@ final class PetView: NSView {
                 fill(ctx, gx, baseY+gy, edge ? Pal.egg2 : Pal.egg1)
             }
         }
-        // manchas
+        // spots
         for (sx, sy) in [(-3, 6), (2, 10), (-1, 14), (4, 9)] {
             fill(ctx, cx+sx+Int(wob), baseY+sy, Pal.egg2)
         }
-        // grietas al eclosionar
+        // cracks when hatching
         if state == .hatching {
             let cyl = baseY + chh
             for (gx, gy) in [(0,2),(1,1),(-1,1),(1,-1),(2,0),(-2,0)] {
@@ -886,7 +886,7 @@ final class PetView: NSView {
         }
     }
 
-    // ---- Fantasma (muerto) ----
+    // ---- Ghost (dead) ----
     func drawGhost(_ ctx: CGContext) {
         let skin = Pal.ghost
         let baseHalf: CGFloat = 10, baseHeight: CGFloat = 16
@@ -898,25 +898,25 @@ final class PetView: NSView {
             let xw = Int(w.rounded())
             for dx in -xw...xw {
                 let gx = cx + dx
-                // borde ondulado abajo (cola de fantasma)
+                // wavy bottom edge (ghost tail)
                 if gy == 0 && (dx % 2 == 0) { continue }
                 let edge = dx <= -xw+1 || dx >= xw-1
                 fill(ctx, gx, gy+floatY, edge ? skin.bodyDark : skin.body)
             }
         }
-        // ojos X y boca triste
+        // X eyes and sad mouth
         let faceY = floatY + Int(baseHeight*0.45)
         for ex in [cx-4, cx+2] {
             fill(ctx, ex, faceY+2, Pal.eye); fill(ctx, ex+2, faceY+2, Pal.eye)
             fill(ctx, ex+1, faceY+1, Pal.eye); fill(ctx, ex, faceY, Pal.eye); fill(ctx, ex+2, faceY, Pal.eye)
         }
-        // halo de ángel
+        // angel halo
         let haloY = floatY + Int(baseHeight) + 2
         for dx in -3...3 { fill(ctx, cx+dx, haloY, Pal.halo) }
         fill(ctx, cx-4, haloY, Pal.halo); fill(ctx, cx+4, haloY, Pal.halo)
     }
 
-    // ---- Popó ----
+    // ---- Poop ----
     func drawPoops(_ ctx: CGContext) {
         guard stats.poops > 0 else { return }
         let pat = ["00100","01110","11111"]
@@ -925,7 +925,7 @@ final class PetView: NSView {
         }
     }
 
-    // ---- Partículas ----
+    // ---- Particles ----
     func drawParticles(_ ctx: CGContext) {
         for p in particles {
             let bx = Int(p.x.rounded()), by = Int(p.y.rounded())
@@ -935,11 +935,11 @@ final class PetView: NSView {
             case 1: drawPattern(ctx, ["00110","00010","00010","11010","11000"], bx, by, Pal.note.withAlphaComponent(a))
             case 2: drawPattern(ctx, ["00100","01110","00100"], bx, by, Pal.star.withAlphaComponent(a))
             case 3: drawPattern(ctx, ["1110","0100","1110"], bx, by, Pal.skin.bodyDark.withAlphaComponent(a))
-            case 4: drawPattern(ctx, ["010","010","111","010"], bx, by, Pal.sweat.withAlphaComponent(a))   // sudor
-            case 5: drawPattern(ctx, ["101","010"], bx, by, Pal.eye.withAlphaComponent(a))                  // mosca
-            case 6: drawPattern(ctx, ["010","101","010"], bx, by, Pal.bubble.withAlphaComponent(a))         // burbuja
-            case 7: fill(ctx, bx, by, Pal.crumb.withAlphaComponent(a))                                      // miga
-            default: drawPattern(ctx, ["00100","01110","00100"], bx, by, Pal.star.withAlphaComponent(a))    // chispa
+            case 4: drawPattern(ctx, ["010","010","111","010"], bx, by, Pal.sweat.withAlphaComponent(a))   // sweat
+            case 5: drawPattern(ctx, ["101","010"], bx, by, Pal.eye.withAlphaComponent(a))                  // fly
+            case 6: drawPattern(ctx, ["010","101","010"], bx, by, Pal.bubble.withAlphaComponent(a))         // bubble
+            case 7: fill(ctx, bx, by, Pal.crumb.withAlphaComponent(a))                                      // crumb
+            default: drawPattern(ctx, ["00100","01110","00100"], bx, by, Pal.star.withAlphaComponent(a))    // spark
             }
         }
     }
@@ -953,7 +953,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // HUD: barras de stats + botones de acción
+    // HUD: stat bars + action buttons
     // ------------------------------------------------------------------
     func layoutButtons() {
         let bw: CGFloat = 26
@@ -962,9 +962,9 @@ final class PetView: NSView {
             buttons = [HudButton(id: "restart", icon: "🥚", rect: NSRect(x: cx - 13, y: 108, width: bw, height: bw))]
             return
         }
-        // Botones contextuales: 🍖 solo si tiene hambre, 💊 solo si está enfermo.
-        // (jugar = doble clic, lavar = frotar, dormir = automático)
-        // El chat es más pequeño y va pegado al slime, a la izquierda.
+        // Contextual buttons: 🍖 only if hungry, 💊 only if sick.
+        // (play = double click, wash = scrub, sleep = automatic)
+        // The chat is smaller and sits next to the slime, on the left.
         let chatSz: CGFloat = 19
         buttons = [HudButton(id: "chat", icon: "💬", rect: NSRect(x: cx - 42, y: 62, width: chatSz, height: chatSz))]
         if stats.hunger < Tuning.careShow {
@@ -980,7 +980,7 @@ final class PetView: NSView {
         (s as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attrs)
     }
 
-    /// Dibuja un SF Symbol tintado, centrado en `rect`. Nítido a cualquier tamaño.
+    /// Draws a tinted SF Symbol, centered in `rect`. Crisp at any size.
     func drawSymbol(_ name: String, in rect: NSRect, _ color: NSColor, size: CGFloat = 13, weight: NSFont.Weight = .regular) {
         let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: weight)
         guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
@@ -996,8 +996,8 @@ final class PetView: NSView {
                                width: s.width, height: s.height))
     }
 
-    /// Dibuja un icono pixel-art centrado en `rect`. Cada char de `rows` mapea a
-    /// un color en `palette` ('0' = transparente). Fila 0 = arriba.
+    /// Draws a pixel-art icon centered in `rect`. Each char of `rows` maps to
+    /// a color in `palette` ('0' = transparent). Row 0 = top.
     func drawPixelIcon(_ ctx: CGContext, _ rows: [String], in rect: NSRect, _ palette: [Character: NSColor]) {
         let cols = rows.map { $0.count }.max() ?? 0
         let n = rows.count
@@ -1017,7 +1017,7 @@ final class PetView: NSView {
         }
     }
 
-    // Iconos pixel-art del header del chat (a juego con el slime).
+    // Pixel-art icons for the chat header (matching the slime).
     static let eyeIcon = [
         "000000000",
         "00EEEEE00",
@@ -1061,26 +1061,26 @@ final class PetView: NSView {
     static let chatAccent = NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1)
     static let chatRecRed = NSColor(srgbRed: 0.96, green: 0.36, blue: 0.40, alpha: 1)
 
-    /// Icono que funciona como medidor: el fondo va apagado (vacío) y la
-    /// porción inferior se "llena" con el color del propio emoji según `value`.
+    /// Icon that works as a gauge: the background stays dimmed (empty) and the
+    /// lower portion "fills up" with the emoji's own color based on `value`.
     func drawStatIcon(_ ctx: CGContext, _ icon: String, _ x: CGFloat, _ y: CGFloat, size: CGFloat, value: Double) {
         let v = CGFloat(max(0, min(1, value)))
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: size)]
         let p = NSPoint(x: x, y: y)
 
-        // base apagada (lo "gastado")
+        // dimmed base (the "spent" part)
         ctx.saveGState()
         ctx.setAlpha(hudAlpha * (v < 0.25 ? 0.12 : 0.20))
         (icon as NSString).draw(at: p, withAttributes: attrs)
         ctx.restoreGState()
 
-        // porción llena, de abajo hacia arriba
+        // filled portion, from bottom to top
         if v > 0.001 {
             ctx.saveGState()
             ctx.clip(to: CGRect(x: x - 3, y: y - 2, width: size + 8, height: (size + 4) * v))
             ctx.setAlpha(hudAlpha)
             (icon as NSString).draw(at: p, withAttributes: attrs)
-            // tinte rojo de alerta cuando está crítico
+            // red alert tint when critical
             if v < 0.25 {
                 ctx.setBlendMode(.sourceAtop)
                 ctx.setFillColor(NSColor.systemRed.withAlphaComponent(0.5).cgColor)
@@ -1100,7 +1100,7 @@ final class PetView: NSView {
             drawText("R.I.P.  ·  toca 🥚 para revivir", (bounds.width - 150)/2, 244, size: 11)
         }
 
-        // --- botones (el fondo se llena como un indicador según su stat) ---
+        // --- buttons (the background fills like an indicator based on its stat) ---
         let statFor: [String: (Double, NSColor)] = [
             "feed":  (stats.hunger,      Pal.barHunger),
             "play":  (stats.happiness,   Pal.barHappy),
@@ -1110,14 +1110,14 @@ final class PetView: NSView {
         ]
         for b in buttons {
             let path = NSBezierPath(roundedRect: b.rect, xRadius: 6, yRadius: 6)
-            // fondo vacío (oscuro)
+            // empty background (dark)
             NSColor(white: 0.12, alpha: 0.80).setFill(); path.fill()
-            // relleno indicador, de abajo hacia arriba
+            // indicator fill, from bottom to top
             if let (value, color) = statFor[b.id] {
                 let v = CGFloat(max(0, min(1, value)))
                 if v > 0.001 {
                     ctx.saveGState()
-                    path.addClip()                                   // recorta al rectángulo redondeado
+                    path.addClip()                                   // clip to the rounded rectangle
                     let c = v < 0.25 ? NSColor.systemRed : color
                     c.withAlphaComponent(0.9).setFill()
                     NSBezierPath(rect: NSRect(x: b.rect.minX, y: b.rect.minY,
@@ -1125,7 +1125,7 @@ final class PetView: NSView {
                     ctx.restoreGState()
                 }
             }
-            // borde + icono encima (siempre visible), escalado al tamaño del botón
+            // border + icon on top (always visible), scaled to the button size
             NSColor(white: 1, alpha: 0.30).setStroke(); path.lineWidth = 1; path.stroke()
             drawText(b.icon, b.rect.minX + b.rect.width * 0.15, b.rect.minY + b.rect.height * 0.15,
                      size: b.rect.width * 0.58)
@@ -1134,7 +1134,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // Globo de diálogo + IA
+    // Dialogue bubble + AI
     // ------------------------------------------------------------------
     var bubbleVisible: Bool { bubbleThinking || (bubbleText != nil && Date() < bubbleUntil) }
 
@@ -1151,10 +1151,10 @@ final class PetView: NSView {
                                                  options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attrs)
         let bw = min(maxW, ceil(tr.width)) + 18, bh = ceil(tr.height) + 12
         let bx = (bounds.width - bw) / 2
-        let by: CGFloat = 88                                    // pegado a la cabeza del slime
+        let by: CGFloat = 88                                    // right above the slime's head
         let rect = NSRect(x: bx, y: by, width: bw, height: bh)
 
-        // colita apuntando hacia abajo (a la cabeza)
+        // little tail pointing downward (to the head)
         let tail = NSBezierPath()
         tail.move(to: NSPoint(x: bounds.width/2 - 6, y: by + 1))
         tail.line(to: NSPoint(x: bounds.width/2, y: by - 9))
@@ -1184,7 +1184,7 @@ final class PetView: NSView {
         bubbleUntil = Date().addingTimeInterval(duration(for: text))
     }
 
-    /// Reacción contextual: pide frase al LLM (si hay clave) o usa enlatada.
+    /// Contextual reaction: asks the LLM for a phrase (if there's a key) or uses a canned one.
     func react(_ sit: Situation) {
         if let client = client, client.config.isConfigured {
             bubbleThinking = true
@@ -1199,9 +1199,9 @@ final class PetView: NSView {
         }
     }
 
-    /// Reacción espontánea (eventos): con enfriamiento para no spamear.
+    /// Spontaneous reaction (events): with a cooldown to avoid spamming.
     func reactSpontaneous(_ sit: Situation) {
-        guard !stats.isAsleep, state != .sleeping else { return }   // callado mientras duerme
+        guard !stats.isAsleep, state != .sleeping else { return }   // quiet while sleeping
         guard Date().timeIntervalSince(lastSpontaneous) > 45 else { return }
         lastSpontaneous = Date()
         react(sit)
@@ -1215,12 +1215,12 @@ final class PetView: NSView {
         }
         bubbleThinking = true
         bubbleUntil = Date().addingTimeInterval(20)
-        let history = Array(convo.suffix(8))         // contexto reciente para el LLM
+        let history = Array(convo.suffix(8))         // recent context for the LLM
         let snapshot = stats
         client.chat(system: Personality.systemPrompt(snapshot), history: history, user: t, maxTokens: 1000) { [weak self] reply in
             guard let self = self else { return }
             let r = reply.flatMap(Personality.sanitize) ?? "Uy, no pude pensar 😵‍💫"
-            self.convo.append(("user", t)); self.convo.append(("assistant", r))   // historial completo
+            self.convo.append(("user", t)); self.convo.append(("assistant", r))   // full history
             self.say(r)
             onReply?(r)
         }
@@ -1233,7 +1233,7 @@ final class PetView: NSView {
     }
 
     // ------------------------------------------------------------------
-    // Chat integrado (panel pixel sobre el slime)
+    // Integrated chat (pixel panel over the slime)
     // ------------------------------------------------------------------
     override var acceptsFirstResponder: Bool { true }
 
@@ -1244,7 +1244,7 @@ final class PetView: NSView {
             convIndex = min(convIndex, chatStore.conversations.count - 1)
             ensureAgent(); listOpen = false; chatStick = true; chatScrollToBottom = true
             persistActiveConversation()
-            // si venía moviéndose, quédate quieto para que el diálogo no se mueva
+            // if it was moving, stay still so the dialogue doesn't move
             if [.dancing, .walking, .rolling, .chasing, .happy, .reacting, .falling].contains(state) { state = .idle; stateTimer = 0 }
             resizeForChat(true)
             window?.makeKeyAndOrderFront(nil)
@@ -1292,17 +1292,17 @@ final class PetView: NSView {
         needsDisplay = true
     }
 
-    /// Al arrancar: abre la conversación que estaba activa la última vez.
+    /// On startup: opens the conversation that was active last time.
     func restoreActiveConversation() {
         if let id = chatStore.activeId,
            let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) {
             convIndex = idx
         } else {
-            convIndex = max(0, chatStore.conversations.count - 1)   // a falta de dato, la más reciente
+            convIndex = max(0, chatStore.conversations.count - 1)   // lacking data, the most recent one
         }
     }
 
-    /// Recuerda cuál es la conversación activa (para restaurarla al reabrir la app).
+    /// Remembers which conversation is active (to restore it when reopening the app).
     func persistActiveConversation() {
         guard convIndex >= 0, convIndex < chatStore.conversations.count else { return }
         chatStore.activeId = chatStore.conversations[convIndex].id
@@ -1324,7 +1324,7 @@ final class PetView: NSView {
         }
     }
 
-    /// Adjunta una captura (su ruta) al último mensaje del usuario, para el thumbnail.
+    /// Attaches a capture (its path) to the user's last message, for the thumbnail.
     func attachShot(_ path: String) {
         guard convIndex < chatStore.conversations.count else { return }
         if let idx = chatStore.conversations[convIndex].messages.lastIndex(where: { $0.role == "user" }) {
@@ -1349,7 +1349,7 @@ final class PetView: NSView {
     func sendChatMessage() {
         let t = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, !chatBusy else { return }
-        wakeUp()                                  // si estaba dormido, despierta al hablarle
+        wakeUp()                                  // if it was asleep, talking to it wakes it up
         chatInput = ""
         let shotPath = pendingShotPath; pendingShotPath = nil
         chatStore.conversations[convIndex].messages.append(Msg(role: "user", content: t, imagePath: shotPath))
@@ -1366,7 +1366,7 @@ final class PetView: NSView {
             chatStore.save(); chatStick = true; needsDisplay = true
         }
 
-        if let shot = shot {                       // pregunta sobre la pantalla → visión
+        if let shot = shot {                       // question about the screen → vision
             stepLines = ["👁️ mirando tu pantalla…"]; chatActivity = 2
             client?.vision(prompt: t, imageBase64: shot) { reply in
                 finish(reply ?? "No pude analizar la pantalla 😅 (revisa el permiso de grabación o usa un modelo con visión).")
@@ -1388,16 +1388,16 @@ final class PetView: NSView {
     }
 
     // ==================================================================
-    // Escucha de reunión: conversación dedicada + resúmenes rodantes por
-    // lotes + síntesis final + transcripción guardada con link clicable.
+    // Meeting listening: dedicated conversation + rolling summaries in
+    // batches + final synthesis + saved transcript with a clickable link.
     // ==================================================================
 
-    /// Al empezar a escuchar: NO crea conversación todavía (se crea al final según
-    /// la duración). Fuerza sesión nueva (meetingConvId = nil) para no adjuntar a la
-    /// reunión anterior, y arranca el timer de resúmenes parciales.
+    /// When starting to listen: does NOT create a conversation yet (it's created at the end
+    /// depending on the duration). Forces a new session (meetingConvId = nil) so it doesn't attach to the
+    /// previous meeting, and starts the partial-summary timer.
     func beginMeeting() {
         guard #available(macOS 13.0, *) else { return }
-        meetingConvId = nil                    // ← cada escucha es una sesión NUEVA
+        meetingConvId = nil                    // ← each listen is a NEW session
         meetingSummarizedLen = 0
         meetingRollingSummaries = []
         meetingStartedAt = Date()
@@ -1406,11 +1406,11 @@ final class PetView: NSView {
         meetingRollTimer = Timer.scheduledTimer(withTimeInterval: 240, repeats: true) { [weak self] _ in
             self?.rollMeetingSummary()
         }
-        Log.write("📝 escucha iniciada")
+        Log.write("📝 listening started")
     }
 
-    /// Crea (una sola vez por sesión) la conversación dedicada, con título según
-    /// sea reunión (🎧) o charla (💬).
+    /// Creates (only once per session) the dedicated conversation, with a title depending on
+    /// whether it's a meeting (🎧) or a talk (💬).
     private func ensureMeetingConversation(isMeeting: Bool) {
         guard meetingConvId == nil else { return }
         let df = DateFormatter(); df.dateFormat = "HH:mm"
@@ -1425,7 +1425,7 @@ final class PetView: NSView {
         chatStore.save(); persistActiveConversation(); ensureAgent()
     }
 
-    /// Añade un mensaje del slime a la conversación de la reunión (por id).
+    /// Adds a message from the slime to the meeting conversation (by id).
     func appendToMeetingConversation(_ text: String, filePath: String? = nil) {
         guard let id = meetingConvId,
               let idx = chatStore.conversations.firstIndex(where: { $0.id == id }) else { return }
@@ -1435,7 +1435,7 @@ final class PetView: NSView {
         needsDisplay = true
     }
 
-    /// Mini-resumen del trozo NUEVO de transcript desde la última vez.
+    /// Mini-summary of the NEW chunk of transcript since last time.
     func rollMeetingSummary(completion: (() -> Void)? = nil) {
         guard #available(macOS 13.0, *) else { completion?(); return }
         let full = MeetingListener.shared.transcript
@@ -1452,9 +1452,9 @@ final class PetView: NSView {
                 let mini = (reply.map { Agent.cleanFinal($0) } ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if !mini.isEmpty {
                     self.meetingRollingSummaries.append(mini)
-                    Log.write("📝 resumen parcial #\(self.meetingRollingSummaries.count): \(mini.prefix(60))")
-                    self.ensureMeetingConversation(isMeeting: true)       // a estas alturas (>4min) ya es reunión
-                    self.appendToMeetingConversation("🎧 " + mini)        // partial en vivo (en su conversación)
+                    Log.write("📝 partial summary #\(self.meetingRollingSummaries.count): \(mini.prefix(60))")
+                    self.ensureMeetingConversation(isMeeting: true)       // by now (>4min) it's already a meeting
+                    self.appendToMeetingConversation("🎧 " + mini)        // live partial (in its conversation)
                     self.say(Loc.t("🎧 anoté algo de la reunión…", "🎧 jotted down something…"))
                 }
                 completion?()
@@ -1462,8 +1462,8 @@ final class PetView: NSView {
         }
     }
 
-    /// Al hacer stop: cierra el último trozo, sintetiza el resumen final en el
-    /// chat (streaming) y adjunta la transcripción completa como link clicable.
+    /// On stop: closes the last chunk, synthesizes the final summary in the
+    /// chat (streaming), and attaches the full transcript as a clickable link.
     func finishMeeting() {
         guard #available(macOS 13.0, *) else { return }
         meetingRollTimer?.invalidate(); meetingRollTimer = nil
@@ -1474,10 +1474,10 @@ final class PetView: NSView {
         let transcript = MeetingListener.shared.fullText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filePath = saveTranscriptFile(transcript)
         let elapsed = Date().timeIntervalSince(meetingStartedAt)
-        let isMeeting = elapsed >= PetView.meetingThreshold     // ≥1 min = reunión; si no, charla
-        Log.write("📝 finalize — \(Int(elapsed))s, \(isMeeting ? "reunión" : "charla"), transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count)")
+        let isMeeting = elapsed >= PetView.meetingThreshold     // ≥1 min = meeting; otherwise a talk
+        Log.write("📝 finalize — \(Int(elapsed))s, \(isMeeting ? "meeting" : "talk"), transcript=\(transcript.count) chars, partials=\(meetingRollingSummaries.count)")
 
-        // Crea la conversación dedicada (título según reunión/charla) y abre el chat.
+        // Creates the dedicated conversation (title based on meeting/talk) and opens the chat.
         ensureMeetingConversation(isMeeting: isMeeting)
         if !chatActive { toggleChat() }
         chatScrollToBottom = true
@@ -1485,22 +1485,22 @@ final class PetView: NSView {
         guard !transcript.isEmpty else {
             appendToMeetingConversation(Loc.t("No escuché nada claro 👂", "Didn't catch anything clear 👂")); return
         }
-        // Sin IA configurada: fallback → muestra lo que escuchó SIN procesar.
+        // No AI configured: fallback → shows what it heard WITHOUT processing.
         guard let client = client, client.config.isConfigured else {
-            Log.write("📝 sin IA → fallback: muestro la transcripción en crudo")
+            Log.write("📝 no AI → fallback: showing the raw transcript")
             appendToMeetingConversation(
                 Loc.t("🎧 Esto fue lo que escuché (sin IA para resumir):\n\n", "🎧 Here's what I heard (no AI to summarize):\n\n") + transcript)
             if let fp = filePath { appendToMeetingConversation(Loc.t("📄 Ver transcripción completa", "📄 View full transcript"), filePath: fp) }
             return
         }
 
-        // Base de la síntesis: si hubo resúmenes rodantes, úsalos (corto); si no, el transcript.
+        // Basis of the synthesis: if there were rolling summaries, use them (short); otherwise the transcript.
         let basis = meetingRollingSummaries.isEmpty
             ? transcript
             : meetingRollingSummaries.map { "- \($0)" }.joined(separator: "\n")
 
-        // Reunión (≥1min): frase de cierre + resumen estructurado. Charla (<1min):
-        // solo un resumen corto, sin frase de cierre ni estructura.
+        // Meeting (≥1min): closing phrase + structured summary. Talk (<1min):
+        // just a short summary, no closing phrase or structure.
         if isMeeting {
             appendToMeetingConversation(Loc.t("✅ Ya terminé de escuchar. Este fue tu resumen:", "✅ Done listening. Here's your summary:"))
         }
@@ -1539,7 +1539,7 @@ final class PetView: NSView {
         })
     }
 
-    /// Guarda la transcripción completa a un .txt y devuelve su ruta.
+    /// Saves the full transcript to a .txt and returns its path.
     private func saveTranscriptFile(_ text: String) -> String? {
         guard !text.isEmpty else { return nil }
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -1550,7 +1550,7 @@ final class PetView: NSView {
         let stamp = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
         let header = Loc.t("Transcripción de reunión — ", "Meeting transcript — ") + stamp + "\n\n"
         do { try (header + text).write(to: url, atomically: true, encoding: .utf8); return url.path }
-        catch { Log.write("📝 no pude guardar la transcripción: \(error.localizedDescription)"); return nil }
+        catch { Log.write("📝 couldn't save the transcript: \(error.localizedDescription)"); return nil }
     }
 
     func confirmAction(_ title: String, _ detail: String, _ cb: @escaping (Bool, Bool) -> Void) {
@@ -1565,7 +1565,7 @@ final class PetView: NSView {
         a.addButton(withTitle: Loc.t("Denegar", "Deny"))
         switch a.runModal() {
         case .alertFirstButtonReturn:  cb(true, false)
-        case .alertSecondButtonReturn: cb(true, true)     // siempre
+        case .alertSecondButtonReturn: cb(true, true)     // always
         default:                       cb(false, false)
         }
     }
@@ -1600,17 +1600,17 @@ final class PetView: NSView {
         needsDisplay = true
     }
 
-    /// Desplazamiento horizontal del cuerpo (vaivén al buscar).
+    /// Horizontal offset of the body (sway while searching).
     func bodyOffsetX() -> CGFloat {
-        if state == .wiggling { return sin(CGFloat(stateTimer) * 0.6) * 3.0 }   // contoneo lateral
+        if state == .wiggling { return sin(CGFloat(stateTimer) * 0.6) * 3.0 }   // sideways wiggle
         guard chatActive && chatBusy else { return 0 }
-        if chatActivity == 1 { return sin(CGFloat(tick) * 0.32) * 3.5 }   // buscando: vaivén
-        if chatActivity == 2 { return sin(CGFloat(tick) * 0.2) * 1.5 }    // mirando: leve
+        if chatActivity == 1 { return sin(CGFloat(tick) * 0.32) * 3.5 }   // searching: sway
+        if chatActivity == 2 { return sin(CGFloat(tick) * 0.2) * 1.5 }    // looking: slight
         return 0
     }
 
-    // ---- dibujo del panel de chat ----
-    struct ChatItem { let text: String; let kind: Int; var imagePath: String? = nil; var filePath: String? = nil }   // 0 slime, 1 user, 2 paso
+    // ---- chat panel drawing ----
+    struct ChatItem { let text: String; let kind: Int; var imagePath: String? = nil; var filePath: String? = nil }   // 0 slime, 1 user, 2 step
 
     func chatItems() -> [ChatItem] {
         var items: [ChatItem] = []
@@ -1622,7 +1622,7 @@ final class PetView: NSView {
         if chatBusy && stepLines.isEmpty && live.isEmpty {
             items.append(ChatItem(text: Loc.t("pensando…", "thinking…"), kind: 2))
         }
-        if chatBusy && !live.isEmpty {               // texto llegando en streaming
+        if chatBusy && !live.isEmpty {               // text arriving via streaming
             items.append(ChatItem(text: live + "▌", kind: 0))
         }
         return items
@@ -1633,13 +1633,13 @@ final class PetView: NSView {
         let W = bounds.width, H = bounds.height
         let pad: CGFloat = 8
         let panel = NSRect(x: pad, y: 96, width: W - 2 * pad, height: H - 96 - pad)
-        // fondo del panel
+        // panel background
         let bg = NSBezierPath(roundedRect: panel, xRadius: 8, yRadius: 8)
         NSColor(white: 0.16, alpha: 0.95).setFill(); bg.fill()
         NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 0.9).setStroke(); bg.lineWidth = 2; bg.stroke()
 
         let header = NSRect(x: panel.minX, y: panel.maxY - 28, width: panel.width, height: 28)
-        // input de altura dinámica (crece con las líneas) + fila de adjunto si hay captura
+        // dynamic-height input (grows with the lines) + attachment row if there's a capture
         let sendW: CGFloat = 30
         let chipH: CGFloat = pendingShot != nil ? 24 : 0
         let inputInnerW = panel.width - 18 - sendW
@@ -1650,7 +1650,7 @@ final class PetView: NSView {
                           width: panel.width - 8, height: header.minY - inputR.maxY - 8)
         chatAreaH = area.height
 
-        // --- header: nombre + botones ---
+        // --- header: name + buttons ---
         drawText("\(stats.displayName) 💬", header.minX + 8, header.minY + 7, size: 12,
                  color: NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1))
         let bs: CGFloat = 20, gapb: CGFloat = 4
@@ -1670,37 +1670,37 @@ final class PetView: NSView {
             chatButtons.append(HudButton(id: id, icon: icon, rect: r))
             bxr -= bs + gapb
         }
-        // línea separadora bajo el header
+        // separator line under the header
         NSColor(white: 1, alpha: 0.12).setFill()
         ctx.fill(CGRect(x: panel.minX + 4, y: header.minY - 1, width: panel.width - 8, height: 1))
 
-        // --- lista de conversaciones (overlay) ---
+        // --- conversation list (overlay) ---
         if listOpen { drawChatList(ctx, area); return }
 
-        // --- mensajes ---
+        // --- messages ---
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         let items = chatItems()
         let maxBW = area.width * 0.82
-        // medir (misma anchura que el dibujo, para no cortar el texto)
+        // measure (same width as the drawing, so the text isn't cut off)
         let heights = items.map { bubbleHeight($0, maxBW, area.width) }
         let spacing: CGFloat = 6
         let total = heights.reduce(0, +) + spacing * CGFloat(max(0, items.count - 1)) + 8
         chatContentH = total
         let maxScroll = max(0, total - area.height)
         if chatScrollToBottom {
-            // al abrir/cambiar de conversación: ver el FINAL (último mensaje completo)
+            // on opening/switching conversation: see the END (last complete message)
             chatScroll = maxScroll
             chatScrollToBottom = false
         } else if chatStick {
-            // mostrar el INICIO del último mensaje (no el final), para no cortar arriba
+            // show the START of the last message (not the end), so the top isn't cut off
             let lastTop = heights.dropLast().reduce(0, +) + spacing * CGFloat(max(0, items.count - 1))
             chatScroll = min(lastTop, maxScroll)
         }
         chatScroll = max(0, min(maxScroll, chatScroll))
 
         ctx.saveGState(); NSBezierPath(rect: area).addClip()
-        // dibujar de arriba (contenido) hacia abajo
-        var cy: CGFloat = 0     // coord contenido desde arriba
+        // draw from top (content) downward
+        var cy: CGFloat = 0     // content coord from the top
         for (i, it) in items.enumerated() {
             let hi = heights[i]
             let screenTop = area.maxY - (cy - chatScroll)
@@ -1712,7 +1712,7 @@ final class PetView: NSView {
         }
         ctx.restoreGState()
 
-        // --- chip de captura adjunta (clic = quitar) ---
+        // --- attached capture chip (click = remove) ---
         if pendingShot != nil {
             let chip = NSRect(x: inputR.minX + 4, y: inputR.maxY - 22, width: 96, height: 20)
             NSColor(white: 0.92, alpha: 0.95).setFill(); NSBezierPath(roundedRect: chip, xRadius: 5, yRadius: 5).fill()
@@ -1724,14 +1724,14 @@ final class PetView: NSView {
             detachRect = chip
         } else { detachRect = .zero }
 
-        // --- input (campo visible, multilínea) + botón enviar ---
+        // --- input (visible field, multiline) + send button ---
         let fieldR = NSRect(x: inputR.minX + 2, y: inputR.minY + 2, width: inputR.width - 4 - sendW, height: inputR.height - 4 - chipH)
         let ip = NSBezierPath(roundedRect: fieldR, xRadius: 5, yRadius: 5)
         NSColor(white: 0.95, alpha: 0.95).setFill(); ip.fill()
         NSColor(white: 0.4, alpha: 1).setStroke(); ip.lineWidth = 1; ip.stroke()
         drawAttr(inputDisplayAttr(), in: fieldR.insetBy(dx: 7, dy: 5))
 
-        // botón enviar (flechita)
+        // send button (little arrow)
         sendRect = NSRect(x: fieldR.maxX + 4, y: fieldR.minY, width: sendW - 4, height: fieldR.height)
         let active = !chatInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !chatBusy
         let sp = NSBezierPath(roundedRect: sendRect, xRadius: 6, yRadius: 6)
@@ -1742,7 +1742,7 @@ final class PetView: NSView {
     }
 
     func drawChatItem(_ it: ChatItem, font: NSFont, area: NSRect, top: CGFloat, height: CGFloat, maxBW: CGFloat) {
-        if it.kind == 2 {   // paso de herramienta / pensando (gris, sin burbuja)
+        if it.kind == 2 {   // tool step / thinking (gray, no bubble)
             drawAttr(chatAttr(it), in: NSRect(x: area.minX + 6, y: top - height, width: area.width - 12, height: height))
             return
         }
@@ -1758,13 +1758,13 @@ final class PetView: NSView {
         let imgH: CGFloat = hasImg ? 66 : 0
         let textRect = NSRect(x: rect.minX + 6, y: rect.minY + 6 + imgH, width: rect.width - 12, height: rect.height - 12 - imgH)
         drawAttr(chatAttr(it), in: textRect)
-        // mensaje con archivo adjunto (transcripción): toda la burbuja es clicable
+        // message with an attached file (transcript): the whole bubble is clickable
         if let path = it.filePath {
             NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 0.9).setStroke()
             let bp = NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5); bp.lineWidth = 1; bp.stroke()
             fileButtons.append((rect, path))
         }
-        // thumbnail de la captura (clicable)
+        // capture thumbnail (clickable)
         if let path = it.imagePath {
             let thumb = NSRect(x: rect.minX + 6, y: rect.minY + 5, width: rect.width - 12, height: imgH - 4)
             let img = imgCache[path] ?? NSImage(contentsOfFile: path)
@@ -1778,7 +1778,7 @@ final class PetView: NSView {
             }
         }
 
-        // botón de copiar al pasar el mouse sobre la burbuja
+        // copy button when hovering over the bubble
         if rect.insetBy(dx: -4, dy: -4).contains(chatMouse) {
             let cb = NSRect(x: rect.maxX - 22, y: rect.maxY - 16, width: 20, height: 14)
             let pb = NSBezierPath(roundedRect: cb, xRadius: 3, yRadius: 3)
@@ -1797,7 +1797,7 @@ final class PetView: NSView {
             let p = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
             NSColor(white: sel ? 0.30 : 0.16, alpha: 0.9).setFill(); p.fill()
             drawText(String(conv.title.prefix(34)), r.minX + 8, r.minY + 5, size: 11)
-            listRowRects.append(r)   // en orden de dibujo (reversed)
+            listRowRects.append(r)   // in draw order (reversed)
             y -= 28
             if y < area.minY { break }
         }
@@ -1806,7 +1806,7 @@ final class PetView: NSView {
     var chatFont: NSFont { NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) }
     var chatPara: NSParagraphStyle { let p = NSMutableParagraphStyle(); p.lineBreakMode = .byWordWrapping; return p }
 
-    /// Convierte Markdown a texto con formato (negrita, itálica, código, listas, encabezados).
+    /// Converts Markdown to formatted text (bold, italic, code, lists, headings).
     func renderMarkdown(_ raw: String, color: NSColor) -> NSAttributedString {
         let pre = raw.components(separatedBy: "\n").map { line -> String in
             let t = line.trimmingCharacters(in: .whitespaces)
@@ -1859,10 +1859,10 @@ final class PetView: NSView {
 
     func attrSize(_ a: NSAttributedString, _ maxW: CGFloat) -> NSSize {
         let r = a.boundingRect(with: NSSize(width: maxW, height: 100_000), options: [.usesLineFragmentOrigin, .usesFontLeading])
-        return NSSize(width: ceil(r.width), height: ceil(r.height) + 6)   // margen extra para no cortar
+        return NSSize(width: ceil(r.width), height: ceil(r.height) + 6)   // extra margin so it's not cut off
     }
 
-    /// Dibuja texto alineado ARRIBA en nuestra vista no-invertida, usando una imagen volteada.
+    /// Draws text TOP-aligned in our non-flipped view, using a flipped image.
     func drawAttr(_ a: NSAttributedString, in rect: NSRect) {
         guard rect.width > 1, rect.height > 1 else { return }
         let img = NSImage(size: rect.size, flipped: true) { b in
@@ -1871,12 +1871,12 @@ final class PetView: NSView {
         img.draw(in: rect)
     }
 
-    /// Ancho de burbuja para un mensaje (texto o con imagen).
+    /// Bubble width for a message (text or with an image).
     func bubbleWidth(_ it: ChatItem, _ maxBW: CGFloat) -> CGFloat {
         let w = attrSize(chatAttr(it), maxBW - 12).width
         return max(it.imagePath != nil ? 116 : 0, min(maxBW, w + 14))
     }
-    /// Altura de burbuja medida al MISMO ancho con el que se dibuja el texto.
+    /// Bubble height measured at the SAME width the text is drawn with.
     func bubbleHeight(_ it: ChatItem, _ maxBW: CGFloat, _ areaW: CGFloat) -> CGFloat {
         if it.kind == 2 { return attrSize(chatAttr(it), areaW - 12).height + 4 }
         let bw = bubbleWidth(it, maxBW)
@@ -1892,19 +1892,19 @@ final class PetView: NSView {
     }
 
     func handleChatTap(_ p: NSPoint) -> Bool {
-        if detachRect != .zero && detachRect.contains(p) {           // quitar la captura adjunta
+        if detachRect != .zero && detachRect.contains(p) {           // remove the attached capture
             pendingShot = nil; pendingShotPath = nil; needsDisplay = true; return true
         }
-        if sendRect.contains(p) { sendChatMessage(); return true }   // botón enviar
-        for t in thumbRects where t.rect.contains(p) {          // abrir la captura
+        if sendRect.contains(p) { sendChatMessage(); return true }   // send button
+        for t in thumbRects where t.rect.contains(p) {          // open the capture
             NSWorkspace.shared.open(URL(fileURLWithPath: t.path))
             return true
         }
-        for f in fileButtons where f.rect.contains(p) {         // abrir la transcripción completa
+        for f in fileButtons where f.rect.contains(p) {         // open the full transcript
             NSWorkspace.shared.open(URL(fileURLWithPath: f.path))
             return true
         }
-        for cb in copyButtons where cb.rect.contains(p) {       // copiar texto de una burbuja
+        for cb in copyButtons where cb.rect.contains(p) {       // copy text from a bubble
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(cb.text, forType: .string)
             stepLines = ["✓ copiado al portapapeles"]
@@ -1927,23 +1927,23 @@ final class PetView: NSView {
             return true
         }
         if listOpen {
-            // las filas se dibujaron en orden reverse(enumerate)
+            // the rows were drawn in reverse(enumerate) order
             let order = Array(chatStore.conversations.indices.reversed())
             for (k, r) in listRowRects.enumerated() where r.contains(p) {
                 if k < order.count { selectConversation(order[k]) }
                 return true
             }
-            return true   // clic dentro de la lista: consumir
+            return true   // click inside the list: consume
         }
         return false
     }
 
     // ------------------------------------------------------------------
-    // Menú contextual (clic derecho)
+    // Context menu (right click)
     // ------------------------------------------------------------------
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
-        // Alimentar (submenú de comidas)
+        // Feed (food submenu)
         let feed = NSMenuItem(title: Loc.t("Alimentar 🍖", "Feed 🍖"), action: nil, keyEquivalent: "")
         let fm = NSMenu()
         for food in Food.allCases {
@@ -1984,14 +1984,14 @@ final class PetView: NSView {
     // ------------------------------------------------------------------
     override func mouseDown(with event: NSEvent) {
         if chatActive {
-            window?.makeFirstResponder(self)        // recuperar foco para escribir
+            window?.makeFirstResponder(self)        // regain focus to type
             let p = convert(event.locationInWindow, from: nil)
             if handleChatTap(p) { consumedByButton = true; return }
-            if p.y > 88 { consumedByButton = true; return }   // clic en el panel: ni arrastra ni salta
+            if p.y > 88 { consumedByButton = true; return }   // click on the panel: neither drags nor jumps
         }
         let p = convert(event.locationInWindow, from: nil)
         consumedByButton = false
-        // ¿clic en un botón del HUD?
+        // click on a HUD button?
         if hudAlpha > 0.4 {
             for b in buttons where b.rect.insetBy(dx: -3, dy: -3).contains(p) {
                 consumedByButton = true; handleButton(b.id, at: event); return
@@ -1999,8 +1999,8 @@ final class PetView: NSView {
         }
         mouseDownAt = NSEvent.mouseLocation
         didDrag = false
-        grabbedSlime = slimeHitRect().contains(p)       // solo cuenta si tocaste al slime
-        if grabbedSlime && stats.isAsleep {             // moverlo lo despierta
+        grabbedSlime = slimeHitRect().contains(p)       // only counts if you touched the slime
+        if grabbedSlime && stats.isAsleep {             // moving it wakes it up
             stats.isAsleep = false
             stats.energy = max(stats.energy, 0.12)
             if state == .sleeping { enter(.idle) }
@@ -2011,13 +2011,13 @@ final class PetView: NSView {
         }
     }
 
-    /// Zona "agarrable": el cuerpo del slime (abajo-centro).
+    /// "Grabbable" zone: the slime's body (bottom-center).
     func slimeHitRect() -> NSRect {
         NSRect(x: slimeOX + 4 * PX, y: 0, width: 24 * PX, height: 22 * PX)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        if consumedByButton || chatActive || !grabbedSlime { return }   // solo arrastra si agarraste al slime
+        if consumedByButton || chatActive || !grabbedSlime { return }   // only drags if you grabbed the slime
         guard !stats.isDead, state != .egg else { return }
         let m = NSEvent.mouseLocation
         if hypot(m.x - mouseDownAt.x, m.y - mouseDownAt.y) > 4 { didDrag = true }
@@ -2025,7 +2025,7 @@ final class PetView: NSView {
             enter(.dragging)
             let vf = (win.screen ?? NSScreen.main)?.visibleFrame ?? win.frame
             var newOrigin = NSPoint(x: m.x - dragOffset.x, y: m.y - dragOffset.y)
-            // no dejar salir de la pantalla
+            // don't let it leave the screen
             let (minX, maxX) = originXBounds(vf)
             newOrigin.x = max(minX, min(maxX, newOrigin.x))
             newOrigin.y = max(vf.minY, min(vf.maxY - bounds.height, newOrigin.y))
@@ -2036,12 +2036,12 @@ final class PetView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         if consumedByButton { consumedByButton = false; return }
-        if chatActive { return }        // con el chat abierto, el slime no salta
-        if !grabbedSlime { return }     // solo reacciona si tocaste al slime, no la burbuja/vacío
+        if chatActive { return }        // with the chat open, the slime doesn't jump
+        if !grabbedSlime { return }     // only reacts if you touched the slime, not the bubble/empty space
         if stats.isDead || state == .egg { return }
         if didDrag {
             vy = 0
-            // ¿soltado pegado a un costado? -> se escurre por la pared
+            // dropped stuck to a side? -> it oozes down the wall
             if let win = petWindow, let vf = (win.screen ?? NSScreen.main)?.visibleFrame {
                 let (minX, maxX) = originXBounds(vf)
                 let thresh: CGFloat = 6
@@ -2056,7 +2056,7 @@ final class PetView: NSView {
         }
         if tick - lastClickTick < 25 { loveClicks += 1 } else { loveClicks = 1 }
         lastClickTick = tick
-        if loveClicks >= 2 { loveClicks = 0; doPlay() }            // doble clic = jugar
+        if loveClicks >= 2 { loveClicks = 0; doPlay() }            // double click = play
         else {
             vy = 12; enter(.reacting)
             if Date().timeIntervalSince(lastClickTalk) > 5 { lastClickTalk = Date(); react(.clicked) }
@@ -2090,7 +2090,7 @@ final class PetView: NSView {
     }
 }
 
-// MARK: - Ventana flotante transparente
+// MARK: - Transparent floating window
 
 final class PetWindow: NSWindow {
     init() {
@@ -2098,7 +2098,7 @@ final class PetWindow: NSWindow {
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless], backing: .buffered, defer: false)
         isOpaque = false; backgroundColor = .clear; hasShadow = false
-        sharingType = .none          // por defecto: no aparecer en grabaciones / compartir pantalla
+        sharingType = .none          // default: don't appear in recordings / screen sharing
         acceptsMouseMovedEvents = true
         level = .floating; ignoresMouseEvents = false; isMovableByWindowBackground = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -2110,15 +2110,15 @@ final class PetWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    /// `hidden=true` => la ventana no aparece en capturas/grabaciones/compartir pantalla.
+    /// `hidden=true` => the window doesn't appear in captures/recordings/screen sharing.
     func applyCapturePrivacy(_ hidden: Bool) { sharingType = hidden ? .none : .readOnly }
 }
 
-// MARK: - Ícono de la barra de menús (mismo pixel-art del slime)
+// MARK: - Menu bar icon (same slime pixel-art)
 
-/// Dibuja el slime verde (cuerpo + brillo + cara feliz) en una NSImage pequeña,
-/// usando la misma lógica de grilla que `PetView.drawSlime` / `drawFace`.
-/// Es el mismo arte del ícono de la app, pero sin fondo, para el status item.
+/// Draws the green slime (body + shine + happy face) in a small NSImage,
+/// using the same grid logic as `PetView.drawSlime` / `drawFace`.
+/// It's the same art as the app icon, but without a background, for the status item.
 func slimeStatusImage(size S: CGFloat = 18) -> NSImage {
     let body  = NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 1)
     let dark  = NSColor(srgbRed: 0.20, green: 0.62, blue: 0.40, alpha: 1)
@@ -2132,16 +2132,16 @@ func slimeStatusImage(size S: CGFloat = 18) -> NSImage {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
         let cx = 16.0, footY = 3
         let halfW = 11.0, height = 17.0
-        let cell = S * 0.94 / 23.0                 // encaja el ancho del slime (~23 celdas)
+        let cell = S * 0.94 / 23.0                 // fits the slime's width (~23 cells)
         let originX = S / 2 - CGFloat(cx) * cell
-        let originY = S / 2 - 11.5 * cell           // centra el bbox vertical (grid y ≈ 3..20)
+        let originY = S / 2 - 11.5 * cell           // centers the vertical bbox (grid y ≈ 3..20)
         func fill(_ gx: Int, _ gy: Int, _ c: NSColor) {
             ctx.setShouldAntialias(false)
             ctx.setFillColor(c.cgColor)
             ctx.fill(CGRect(x: originX + CGFloat(gx) * cell, y: originY + CGFloat(gy) * cell,
                             width: cell + 0.4, height: cell + 0.4))
         }
-        // cuerpo (misma fórmula elíptica + borde + highlight)
+        // body (same elliptical formula + border + highlight)
         for gy in 0..<Int(height) {
             let t = Double(gy) / height
             var w = halfW * (max(0, 1 - pow(t, 2.2))).squareRoot()
@@ -2157,7 +2157,7 @@ func slimeStatusImage(size S: CGFloat = 18) -> NSImage {
         }
         let shineY = footY + Int(height * 0.72)
         fill(Int(cx) - 4, shineY, shine); fill(Int(cx) - 5, shineY, shine); fill(Int(cx) - 4, shineY - 1, shine)
-        // cara feliz mirando al frente
+        // happy face looking forward
         let faceY = footY + Int(height * 0.45)
         let leftX = Int(cx) - 4, rightX = Int(cx) + 4
         func eyeOpen(_ ex: Int) {
@@ -2169,7 +2169,7 @@ func slimeStatusImage(size S: CGFloat = 18) -> NSImage {
         for ox in -1...1 { fill(Int(cx) + ox, faceY - 4, mouth) }
         return true
     }
-    img.isTemplate = false      // a color (no monocromo), como el ícono de la app
+    img.isTemplate = false      // in color (not monochrome), like the app icon
     return img
 }
 
@@ -2184,15 +2184,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var frame = 0
     var activity: NSObjectProtocol?
 
-    // rate-limit de avisos
+    // alert rate-limit
     var alerted: [String: Date] = [:]
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        // Log de arranque: ruta del binario + estado del permiso de pantalla (TCC).
-        // Si CGPreflight cambia de true→false entre lanzamientos, la firma no es estable.
-        Log.write("🚀 Flubber arrancó — bin=\(Bundle.main.executablePath ?? "?") · permiso pantalla(preflight)=\(CGPreflightScreenCaptureAccess())")
+        // Startup log: binary path + screen permission state (TCC).
+        // If CGPreflight changes true→false between launches, the signature isn't stable.
+        Log.write("🚀 Flubber started — bin=\(Bundle.main.executablePath ?? "?") · screen permission(preflight)=\(CGPreflightScreenCaptureAccess())")
 
-        // Evita que macOS "duerma" la app en segundo plano (necesitamos seguir animando).
+        // Prevents macOS from "sleeping" the app in the background (we need to keep animating).
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                          reason: "SlimePet animation loop")
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -2203,13 +2203,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.stats = PetStats.load()
         Pal.index = min(max(0, view.stats.skinIndex), Pal.skins.count - 1)
         view.state = view.stats.isDead ? .dead : (view.stats.stage == .egg ? .egg : .idle)
-        view.restoreActiveConversation()             // abre la última conversación que usabas
+        view.restoreActiveConversation()             // opens the last conversation you were using
 
-        // IA
+        // AI
         let cfg = AIConfig.load()
-        Loc.override = cfg.lang                      // idioma guardado (nil = sistema)
+        Loc.override = cfg.lang                      // saved language (nil = system)
         view.client = makeBackend(cfg)
-        window.applyCapturePrivacy(cfg.hideFromCaptureValue)   // oculto por defecto
+        window.applyCapturePrivacy(cfg.hideFromCaptureValue)   // hidden by default
         if let spec = cfg.customSkin, let skin = Pal.skin(from: spec) { Pal.setAISkin(skin) }
         view.onChatRequested = { [weak self] in self?.openChat() }
         view.onToggleListen = { [weak self] in self?.toggleListen() }
@@ -2218,10 +2218,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
 
-        // saludo al abrir
+        // greeting on open
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
             guard let v = self?.view else { return }
-            if v.stats.isDead {                                   // murió mientras estuvo cerrado
+            if v.stats.isDead {                                   // it died while closed
                 self?.notify("💀 \(v.stats.displayName) " + Loc.t("ha muerto", "has died"),
                              Loc.t("Lo descuidaste demasiado… toca 🥚 para empezar de nuevo.",
                                    "Too neglected… tap 🥚 to start over."))
@@ -2232,7 +2232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem?.button?.image = slimeStatusImage()      // mismo slime pixel-art que el ícono
+        statusItem?.button?.image = slimeStatusImage()      // same slime pixel-art as the icon
         statusItem?.button?.title = ""
         rebuildMenu()
 
@@ -2249,7 +2249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         handleEvents(events)
         checkAttentionAlerts()
         frame += 1
-        if frame % 300 == 0 { view.stats.save() }     // guarda cada ~10 s
+        if frame % 300 == 0 { view.stats.save() }     // saves every ~10 s
     }
 
     func handleEvents(_ events: [PetEvent]) {
@@ -2270,7 +2270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !s.isDead, s.stage != .egg else { return }
         func maybe(_ key: String, _ cond: Bool, _ title: String, _ body: String) {
             if cond {
-                if let last = alerted[key], Date().timeIntervalSince(last) < 600 { return }   // máx 1 cada 10 min
+                if let last = alerted[key], Date().timeIntervalSince(last) < 600 { return }   // max 1 every 10 min
                 alerted[key] = Date(); notify(title, body)
             } else { alerted[key] = nil }
         }
@@ -2279,7 +2279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         maybe("energy", s.energy < Tuning.lowThreshold, Loc.t("😴 Estoy agotado", "😴 I'm exhausted"), Loc.t("\(n) necesita dormir.", "\(n) needs to sleep."))
         maybe("clean",  s.cleanliness < Tuning.lowThreshold, Loc.t("🛁 ¡Qué sucio!", "🛁 So dirty!"), Loc.t("Hay que limpiar a \(n).", "\(n) needs a clean."))
 
-        // que también lo diga en el globo, al mismo umbral que aparece el botón
+        // also say it in the bubble, at the same threshold the button appears
         if s.isSick { view.reactSpontaneous(.sick) }
         else if s.hunger < Tuning.careShow { view.reactSpontaneous(.hungry) }
         else if s.energy < Tuning.careShow { view.reactSpontaneous(.tired) }
@@ -2323,7 +2323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(hideItem)
         menu.addItem(NSMenuItem(title: Loc.t("Idioma: English 🌐", "Language: Español 🌐"), action: #selector(toggleLang), keyEquivalent: ""))
         menu.addItem(.separator())
-        // Submenú con todas las animaciones
+        // Submenu with all the animations
         let animItem = NSMenuItem(title: Loc.t("Animaciones 🎭", "Animations 🎭"), action: nil, keyEquivalent: "")
         let animMenu = NSMenu()
         let anims: [(String, String, Selector, String)] = [
@@ -2357,11 +2357,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func toggleLang() {
-        let next = Loc.lang == .es ? "en" : "es"     // alterna respecto al idioma efectivo
+        let next = Loc.lang == .es ? "en" : "es"     // toggles relative to the effective language
         Loc.override = next
         view.client?.config.lang = next
         view.client?.config.save()
-        view.agent = nil                              // re-siembra prompts en el nuevo idioma
+        view.agent = nil                              // re-seeds prompts in the new language
         rebuildMenu()
         view.needsDisplay = true
     }
@@ -2415,13 +2415,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if a.runModal() == .alertFirstButtonReturn { view.setName(tf.stringValue) }
     }
 
-    // --- IA: chat integrado ---
+    // --- AI: integrated chat ---
     @objc func openChat() {
         if view.client?.config.isConfigured != true { showNeedConfig(); return }
         view.toggleChat()
     }
 
-    // --- Escuchar reunión (audio del sistema → transcripción on-device) ---
+    // --- Listen to meeting (system audio → on-device transcription) ---
     @objc func toggleListen() {
         guard #available(macOS 13.0, *) else {
             notify("Flubber", Loc.t("La escucha requiere macOS 13+.", "Listening requires macOS 13+.")); return
@@ -2433,9 +2433,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             view.listening = false
             view.say(Loc.t("Listo, déjame contarte lo que escuché… 📝", "Done, let me tell you what I heard… 📝"))
             rebuildMenu()
-            // Espera a que el último segmento de voz se vuelque y cierra/resume.
+            // Wait for the last speech segment to flush, then close/summarize.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
-                Log.write("📝 stop → finalizando reunión (síntesis + transcripción)")
+                Log.write("📝 stop → finalizing meeting (synthesis + transcript)")
                 self?.view.finishMeeting()
             }
         } else {
@@ -2444,7 +2444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Log.write("🎧 toggleListen.start callback ok=\(ok) err=\(err ?? "-")")
                     if ok {
                         self?.view.listening = true
-                        self?.view.beginMeeting()                  // nueva sesión + resúmenes rodantes
+                        self?.view.beginMeeting()                  // new session + rolling summaries
                         self?.view.say(Loc.t("Escuchando… 🎧", "Listening… 🎧"))
                     } else {
                         self?.notify("Flubber", err ?? Loc.t("No pude escuchar.", "Couldn't listen."))
@@ -2511,7 +2511,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // --- IA: crear skin ---
+    // --- AI: create skin ---
     @objc func makeSkin() {
         guard view.client?.config.isConfigured == true else { showNeedConfig(); return }
         NSApp.activate(ignoringOtherApps: true)
@@ -2546,7 +2546,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         a.runModal()
     }
 
-    // --- IA: configuración ---
+    // --- AI: configuration ---
     var configController: ConfigController?
     @objc func showConfig() {
         if configController == nil {
@@ -2563,7 +2563,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ n: Notification) { view.stats.save() }
 }
 
-// MARK: - Campos de texto que aceptan ⌘V/⌘C/⌘X/⌘A en apps sin barra de menús
+// MARK: - Text fields that accept ⌘V/⌘C/⌘X/⌘A in apps without a menu bar
 
 private func handleEditingShortcut(_ event: NSEvent, _ sender: NSView) -> Bool {
     guard event.modifierFlags.contains(.command),
@@ -2592,7 +2592,7 @@ final class PastableSecureTextField: NSSecureTextField {
     }
 }
 
-// MARK: - Ventana de configuración de IA
+// MARK: - AI settings window
 
 final class ConfigController: NSObject, NSWindowDelegate {
     var window: NSWindow!
@@ -2607,7 +2607,7 @@ final class ConfigController: NSObject, NSWindowDelegate {
     private var oaModelPopup: NSPopUpButton!, dsModelPopup: NSPopUpButton!
     private var statusLabel: NSTextField!
 
-    // orden de proveedores en el popup
+    // provider order in the popup
     private let providers = ["minimax", "claude", "openai", "deepseek"]
     private let mmTitles = ["MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2"]
     private let clTitles = ["Haiku 4.5 (económico)", "Sonnet 4.6", "Opus 4.8"]
@@ -2648,7 +2648,7 @@ final class ConfigController: NSObject, NSWindowDelegate {
         let console = NSButton(title: "Abrir consola ↗", target: self, action: #selector(openConsole))
         console.frame = NSRect(x: W-160, y: H-69, width: 140, height: 28); c.addSubview(console)
 
-        // Las secciones ocupan el mismo espacio; solo se ve la del proveedor activo.
+        // The sections occupy the same space; only the active provider's is visible.
         let boxFrame = NSRect(x: 20, y: 110, width: W-40, height: 110)
         mmBox = NSView(frame: boxFrame); clBox = NSView(frame: boxFrame)
         oaBox = NSView(frame: boxFrame); dsBox = NSView(frame: boxFrame)
@@ -2755,16 +2755,16 @@ final class ConfigController: NSObject, NSWindowDelegate {
     }
 
     @objc private func testConn() {
-        persist()                      // guarda antes de probar, así no se pierde
+        persist()                      // saves before testing, so it isn't lost
         let c = config
         statusLabel.stringValue = "Probando…"
         makeBackend(c).test { [weak self] _, msg in self?.statusLabel.stringValue = msg }
     }
 
-    /// Lee los campos, guarda en Keychain/disco y actualiza el cliente vivo.
+    /// Reads the fields, saves to Keychain/disk, and updates the live client.
     private func persist() {
         config = current()
-        config.save()                  // clave → Keychain, resto → config.json
+        config.save()                  // key → Keychain, rest → config.json
         onSave(config)
     }
 
@@ -2775,7 +2775,7 @@ final class ConfigController: NSObject, NSWindowDelegate {
 
     @objc private func closeWin() { persist(); window.orderOut(nil) }
 
-    // Guarda también si cierran con el botón rojo / ⌘W.
+    // Also saves if closed with the red button / ⌘W.
     func windowWillClose(_ notification: Notification) { persist() }
 }
 

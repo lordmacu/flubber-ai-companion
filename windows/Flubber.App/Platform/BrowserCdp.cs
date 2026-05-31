@@ -9,9 +9,9 @@ using Flubber.Core.Util;
 namespace Flubber.App.Platform;
 
 /// <summary>
-/// Control del navegador por Chrome DevTools Protocol (Chrome/Edge/Brave).
-/// Reemplazo de los Apple Events de macOS: lee la pestaña activa y ejecuta JS.
-/// Requiere que el navegador se haya abierto con --remote-debugging-port=9222.
+/// Browser control via the Chrome DevTools Protocol (Chrome/Edge/Brave).
+/// Replacement for macOS's Apple Events: reads the active tab and runs JS.
+/// Requires the browser to have been opened with --remote-debugging-port=9222.
 /// </summary>
 public static class BrowserCdp
 {

@@ -2,20 +2,20 @@ using System.Runtime.InteropServices;
 
 namespace Flubber.App.Interop;
 
-/// <summary>P/Invoke a las pocas APIs Win32 que necesitamos (stealth, estilos, cursor).</summary>
+/// <summary>P/Invoke for the few Win32 APIs we need (stealth, styles, cursor).</summary>
 internal static class Native
 {
-    // --- Stealth: excluir de capturas/grabaciones/compartir pantalla ---
+    // --- Stealth: exclude from captures/recordings/screen sharing ---
     public const uint WDA_NONE = 0x0;
     public const uint WDA_EXCLUDEFROMCAPTURE = 0x11;   // Windows 10 2004+
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
-    // --- Estilos de ventana extendidos ---
+    // --- Extended window styles ---
     public const int GWL_EXSTYLE = -20;
-    public const int WS_EX_TOOLWINDOW = 0x00000080;   // fuera del Alt-Tab
-    public const int WS_EX_NOACTIVATE = 0x08000000;   // no robar el foco
+    public const int WS_EX_TOOLWINDOW = 0x00000080;   // outside the Alt-Tab list
+    public const int WS_EX_NOACTIVATE = 0x08000000;   // don't steal focus
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -23,7 +23,7 @@ internal static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-    // --- Cursor global (para que el slime "mire" al puntero) ---
+    // --- Global cursor (so the slime "looks" at the pointer) ---
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT { public int X; public int Y; }
 
@@ -41,7 +41,7 @@ internal static class Native
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
-    // --- Enumeración de ventanas (para capturar una app concreta) ---
+    // --- Window enumeration (to capture a specific app) ---
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -51,7 +51,7 @@ internal static class Native
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
-    public static extern bool IsIconic(IntPtr hWnd);   // minimizada
+    public static extern bool IsIconic(IntPtr hWnd);   // minimized
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
@@ -63,5 +63,5 @@ internal static class Native
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     [DllImport("user32.dll")]
-    public static extern bool DestroyIcon(IntPtr hIcon);   // liberar el HICON de GetHicon()
+    public static extern bool DestroyIcon(IntPtr hIcon);   // release the HICON from GetHicon()
 }

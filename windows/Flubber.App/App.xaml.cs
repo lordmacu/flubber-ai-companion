@@ -12,11 +12,11 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // Cifrado de claves con DPAPI (debe quedar listo ANTES del primer Load).
+        // Key encryption with DPAPI (must be ready BEFORE the first Load).
         AIConfig.ProtectFn = SecretProtector.Protect;
         AIConfig.UnprotectFn = SecretProtector.Unprotect;
 
-        // Idioma guardado (config) antes de construir la UI.
+        // Saved language (config) before building the UI.
         var cfg = AIConfig.Load();
         Loc.Override = cfg.Lang;
 

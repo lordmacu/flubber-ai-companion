@@ -2,7 +2,7 @@ using Flubber.Core.Platform;
 
 namespace Flubber.Core.Util;
 
-/// <summary>Log a archivo (%APPDATA%\SlimePet\slimepet.log) + stderr.</summary>
+/// <summary>Log to file (%APPDATA%\SlimePet\slimepet.log) + stderr.</summary>
 public static class Log
 {
     private static readonly object Gate = new();

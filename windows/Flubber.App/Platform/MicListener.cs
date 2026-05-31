@@ -7,10 +7,10 @@ using Flubber.Core.Util;
 namespace Flubber.App.Platform;
 
 /// <summary>
-/// Escucha el MICRÓFONO (tu voz) con NAudio (WasapiCapture del dispositivo de entrada
-/// por defecto) y lo transcribe ON-DEVICE con System.Speech. Mismo stack que
-/// <see cref="MeetingListener"/> (audio del sistema), pero la fuente es el micrófono.
-/// Es una fuente INDEPENDIENTE: su propio icono 🎤, separado del 👂 del sistema.
+/// Listens to the MICROPHONE (your voice) with NAudio (WasapiCapture of the default
+/// input device) and transcribes it ON-DEVICE with System.Speech. Same stack as
+/// <see cref="MeetingListener"/> (system audio), but the source is the microphone.
+/// It's an INDEPENDENT source: its own 🎤 icon, separate from the system's 👂.
 /// </summary>
 public sealed class MicListener
 {
@@ -39,8 +39,8 @@ public sealed class MicListener
         if (IsListening) return true;
         try
         {
-            Log.Write("🎤 mic.start — abriendo WaveInEvent (micrófono)…");
-            _capture = new WaveInEvent { WaveFormat = new WaveFormat(44100, 16, 1) };   // mic por defecto, PCM 44.1kHz/16/mono
+            Log.Write("🎤 mic.start — opening WaveInEvent (microphone)…");
+            _capture = new WaveInEvent { WaveFormat = new WaveFormat(44100, 16, 1) };   // default mic, PCM 44.1kHz/16/mono
             _buffered = new BufferedWaveProvider(_capture.WaveFormat)
             {
                 ReadFully = false,
@@ -68,7 +68,7 @@ public sealed class MicListener
             _pump.Start();
             _engine.RecognizeAsync(RecognizeMode.Multiple);
             IsListening = true;
-            Log.Write($"🎤 mic capturando ✅ origen={_capture.WaveFormat}");
+            Log.Write($"🎤 mic capturing ✅ source={_capture.WaveFormat}");
             return true;
         }
         catch (Exception ex)
@@ -101,7 +101,7 @@ public sealed class MicListener
         var txt = (e.Result?.Text ?? "").Trim();
         if (txt.Length == 0) return;
         lock (_lock) { _transcript += (_transcript.Length > 0 ? " " : "") + txt; _partial = ""; }
-        Log.Write("🎤 segmento: " + (txt.Length > 60 ? txt[..60] : txt));
+        Log.Write("🎤 segment: " + (txt.Length > 60 ? txt[..60] : txt));
     }
 
     public void Stop()

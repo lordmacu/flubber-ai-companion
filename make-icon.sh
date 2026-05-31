@@ -1,5 +1,5 @@
 #!/bin/bash
-# Genera icon/AppIcon.icns a partir del slime pixel-art (icon/make-icon.swift).
+# Generates icon/AppIcon.icns from the slime pixel-art (icon/make-icon.swift).
 set -e
 cd "$(dirname "$0")"
 
@@ -11,7 +11,7 @@ ICONSET=/tmp/Flubber.iconset
 /tmp/flubber-mkicon "$MASTER" 1024
 rm -rf "$ICONSET"; mkdir -p "$ICONSET"
 
-# Tamaños que exige iconutil (Apple).
+# Sizes required by iconutil (Apple).
 sips -z 16   16   "$MASTER" --out "$ICONSET/icon_16x16.png"      >/dev/null
 sips -z 32   32   "$MASTER" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null
 sips -z 32   32   "$MASTER" --out "$ICONSET/icon_32x32.png"      >/dev/null

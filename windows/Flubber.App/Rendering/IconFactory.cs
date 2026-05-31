@@ -6,9 +6,9 @@ using Flubber.App.Interop;
 namespace Flubber.App.Rendering;
 
 /// <summary>
-/// Icono de la bandeja. Carga trayicon.png (embebido), que es EXACTAMENTE el mismo
-/// render pixel-art que el icono de macOS (icon/make-icon.swift) → icono idéntico
-/// en ambas plataformas. Se regenera con windows/gen-icon.sh.
+/// The tray icon. Loads trayicon.png (embedded), which is EXACTLY the same
+/// pixel-art render as the macOS icon (icon/make-icon.swift) → identical icon
+/// on both platforms. Regenerated with windows/gen-icon.sh.
 /// </summary>
 public static class IconFactory
 {
