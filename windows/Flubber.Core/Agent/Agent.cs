@@ -147,6 +147,15 @@ public sealed class Agent
                 return await GateAsync("command", Loc.T("Ejecutar comando", "Run command"), cmd,
                     () => _platform.RunCommandAsync(cmd)).ConfigureAwait(false);
             }
+            case "usar_microfono": return await _platform.StartMicAsync().ConfigureAwait(false);
+            case "apagar_microfono": return await _platform.StopMicAsync().ConfigureAwait(false);
+            case "resumen_reunion":
+            {
+                var t = _platform.MeetingTranscript;
+                return string.IsNullOrEmpty(t)
+                    ? Loc.T("No hay nada transcrito aún. Activa el micrófono primero.", "Nothing transcribed yet. Turn on the mic first.")
+                    : Loc.T("Transcripción:\n", "Transcript:\n") + t;
+            }
             default: return "Herramienta desconocida.";
         }
     }
@@ -191,6 +200,9 @@ public sealed class Agent
             "navegador_js" => Loc.T("🌐 controlando el navegador", "🌐 controlling the browser"),
             "abrir" => Loc.T("🔗 quiere abrir ", "🔗 wants to open ") + (!string.IsNullOrEmpty(a.Str("objetivo")) ? a.Str("objetivo") : a.Str("url")),
             "ejecutar_comando" => Loc.T("💻 quiere ejecutar un comando", "💻 wants to run a command"),
+            "usar_microfono" => Loc.T("🎤 activando el micrófono", "🎤 turning on the mic"),
+            "apagar_microfono" => Loc.T("🎤 apagando el micrófono", "🎤 turning off the mic"),
+            "resumen_reunion" => Loc.T("📝 resumiendo", "📝 summarizing"),
             _ => "🔧 " + c.Name,
         };
     }

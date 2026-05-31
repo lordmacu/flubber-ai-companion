@@ -55,6 +55,8 @@ public partial class PetWindow : Window, IPlatformBridge
     private int _wallSide;           // -1 izquierda, +1 derecha, 0 ninguno
     private int _nextWander = 240;
     private long _lastDownTick;      // para detectar doble clic de forma fiable
+    private bool _chasing;           // persiguiendo el cursor
+    private int _chaseUntil;
 
     // escucha de reunión
     private bool _listening;
@@ -181,6 +183,18 @@ public partial class PetWindow : Window, IPlatformBridge
         return (p.Left, Math.Max(p.Left, p.Right - Width), p.Bottom - Height);
     }
 
+    /// <summary>Posición del cursor en DIP (para perseguirlo en coordenadas de ventana).</summary>
+    private System.Windows.Point CursorDip()
+    {
+        var (cxp, cyp) = Native.CursorPos();
+        var src = PresentationSource.FromVisual(this);
+        if (src?.CompositionTarget != null)
+            return src.CompositionTarget.TransformFromDevice.Transform(new System.Windows.Point(cxp, cyp));
+        return new System.Windows.Point(cxp, cyp);
+    }
+
+    private void StartChase() { _chasing = true; _chaseUntil = _tick + 300; _walking = _rolling = false; _wallSide = 0; }
+
     /// <summary>Mueve la ventana: pasear/rodar, caída con gravedad y escurrirse por la pared.</summary>
     private void UpdateMovement()
     {
@@ -189,7 +203,20 @@ public partial class PetWindow : Window, IPlatformBridge
         var (leftBound, rightBound, ground) = Bounds();
 
         if (_stats.IsDead || _stats.Stage == LifeStage.Egg || _stats.IsAsleep)
-        { _walking = _rolling = _falling = false; _wallSide = 0; return; }
+        { _walking = _rolling = _falling = _chasing = false; _wallSide = 0; return; }
+
+        // 0) perseguir el cursor (con brinco), hasta alcanzarlo o agotar el tiempo
+        if (_chasing)
+        {
+            var cur = CursorDip();
+            var dx = cur.X - (Left + Width / 2);
+            _facing = dx >= 0 ? 1 : -1;
+            Left = Math.Clamp(Left + Math.Max(-6, Math.Min(6, dx * 0.12)), leftBound, rightBound);
+            Top = ground - Math.Abs(Math.Sin(_tick * 0.4)) * 14;     // brinco
+            if (Math.Abs(dx) < 26 || _tick >= _chaseUntil)
+            { _chasing = false; Top = ground; SetTransient(SlimeState.Happy, 30); }
+            return;
+        }
 
         // 1) caída en el aire (tras soltar el arrastre)
         if (_falling)
@@ -260,6 +287,7 @@ public partial class PetWindow : Window, IPlatformBridge
             else if (_stats.IsAsleep) _view.State = SlimeState.Sleeping;
             else if (_falling) _view.State = SlimeState.Falling;
             else if (_wallSide != 0) _view.State = SlimeState.StuckWall;
+            else if (_chasing) _view.State = SlimeState.Chasing;
             else if (_rolling) _view.State = SlimeState.Rolling;
             else if (_walking) _view.State = SlimeState.Walking;
             else _view.State = SlimeState.Idle;
@@ -280,6 +308,17 @@ public partial class PetWindow : Window, IPlatformBridge
             var p = Math.Sin(Math.Clamp((double)(_tick - _transientStart) / Math.Max(1, _transientFrames), 0, 1) * Math.PI);
             _view.ScaleY = 1 + p * 0.28;                              // se estira hacia arriba
             _view.ScaleX = 1 - p * 0.18;
+        }
+        else if (_view.State == SlimeState.Dizzy)
+        {
+            _view.ScaleX = 1.05 + Math.Sin(_tick * 0.3) * 0.03;       // tambaleo mareado
+            _view.ScaleY = 0.95;
+        }
+        else if (_view.State == SlimeState.Yawning)
+        {
+            var p = Math.Sin(Math.Clamp((double)(_tick - _transientStart) / Math.Max(1, _transientFrames), 0, 1) * Math.PI);
+            _view.ScaleY = 1 + p * 0.18;                              // se estira al bostezar
+            _view.ScaleX = 1 - p * 0.08;
         }
 
         _view.Listening = _listening;
@@ -396,14 +435,20 @@ public partial class PetWindow : Window, IPlatformBridge
         m.Items.Add(MeetingListener.Shared.IsListening
             ? Loc.T("Dejar de escuchar la reunión ⏹️", "Stop listening to meeting ⏹️")
             : Loc.T("Escuchar reunión 👂", "Listen to meeting 👂"), null, (_, _) => ToggleListen());
+        m.Items.Add(MicListener.Shared.IsListening
+            ? Loc.T("Apagar micrófono ⏹️", "Turn off microphone ⏹️")
+            : Loc.T("Incluir mi micrófono 🎤", "Include my microphone 🎤"), null, (_, _) => ToggleMic());
         m.Items.Add(Loc.T("Configurar IA… ⚙️", "AI settings… ⚙️"), null, (_, _) => OpenSettings());
         var anim = new Forms.ToolStripMenuItem(Loc.T("Animaciones 🎭", "Animations 🎭"));
         anim.DropDownItems.Add(Loc.T("¡Pasea! 🚶", "Walk! 🚶"), null, (_, _) => StartWalk());
+        anim.DropDownItems.Add(Loc.T("Persíguelo 🏃", "Chase cursor 🏃"), null, (_, _) => StartChase());
         anim.DropDownItems.Add(Loc.T("¡Baila! 💃", "Dance! 💃"), null, (_, _) => SetTransient(SlimeState.Dancing, 120));
         anim.DropDownItems.Add(Loc.T("¡Rueda! 🤸", "Roll! 🤸"), null, (_, _) => StartWalk(roll: true));
         anim.DropDownItems.Add(Loc.T("¡Salta! ⤴️", "Jump! ⤴️"), null, (_, _) => SetTransient(SlimeState.Happy, 40));
         anim.DropDownItems.Add(Loc.T("Contonéate 🪩", "Wiggle 🪩"), null, (_, _) => SetTransient(SlimeState.Wiggling, 38));
         anim.DropDownItems.Add(Loc.T("Estírate 🙆", "Stretch 🙆"), null, (_, _) => SetTransient(SlimeState.Stretching, 42));
+        anim.DropDownItems.Add(Loc.T("Maréate 😵‍💫", "Spin 😵‍💫"), null, (_, _) => SetTransient(SlimeState.Dizzy, 75));
+        anim.DropDownItems.Add(Loc.T("Bosteza 🥱", "Yawn 🥱"), null, (_, _) => SetTransient(SlimeState.Yawning, 40));
         m.Items.Add(anim);
         m.Items.Add(Loc.T("Cambiar color 🎨", "Change color 🎨"), null, (_, _) => CycleColor());
 
@@ -510,6 +555,22 @@ public partial class PetWindow : Window, IPlatformBridge
     {
         if (MeetingListener.Shared.IsListening) StopMeeting();
         else StartMeeting();
+    }
+
+    private void ToggleMic()
+    {
+        if (MicListener.Shared.IsListening)
+        {
+            MicListener.Shared.Stop();
+            _tray.ContextMenuStrip = BuildMenu();
+            Notify("Flubber", Loc.T("Apagué el micrófono 🎤", "Mic off 🎤"));
+        }
+        else if (MicListener.Shared.Start(out var err))
+        {
+            _tray.ContextMenuStrip = BuildMenu();
+            Notify("Flubber", Loc.T("Te escucho por el micrófono 🎤", "I can hear your mic 🎤"));
+        }
+        else { Notify("Flubber", err ?? Loc.T("No pude usar el micrófono.", "Couldn't use the mic.")); }
     }
 
     private void StartMeeting()

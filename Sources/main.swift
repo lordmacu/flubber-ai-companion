@@ -980,6 +980,22 @@ final class PetView: NSView {
         (s as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attrs)
     }
 
+    /// Dibuja un SF Symbol tintado, centrado en `rect`. Nítido a cualquier tamaño.
+    func drawSymbol(_ name: String, in rect: NSRect, _ color: NSColor, size: CGFloat = 13, weight: NSFont.Weight = .regular) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: weight)
+        guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg) else { return }
+        let s = base.size
+        let tinted = NSImage(size: s, flipped: false) { r in
+            base.draw(in: r)
+            color.set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: rect.midX - s.width / 2, y: rect.midY - s.height / 2,
+                               width: s.width, height: s.height))
+    }
+
     /// Dibuja un icono pixel-art centrado en `rect`. Cada char de `rows` mapea a
     /// un color en `palette` ('0' = transparente). Fila 0 = arriba.
     func drawPixelIcon(_ ctx: CGContext, _ rows: [String], in rect: NSRect, _ palette: [Character: NSColor]) {
@@ -1644,11 +1660,11 @@ final class PetView: NSView {
             let p = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
             NSColor(white: 1, alpha: 0.12).setFill(); p.fill()
             switch id {
-            case "eye": drawPixelIcon(ctx, Self.eyeIcon, in: r, ["E": Self.chatAccent, "W": .white])
-            case "ear": drawPixelIcon(ctx, listening ? Self.stopIcon : Self.earIcon, in: r,
-                                      listening ? ["R": Self.chatRecRed] : ["B": Self.chatAccent, "P": Pal.heart])
-            case "mic": drawPixelIcon(ctx, micOn ? Self.stopIcon : Self.micIcon, in: r,
-                                      micOn ? ["R": Self.chatRecRed] : ["M": Self.chatAccent])
+            case "eye": drawSymbol("eye", in: r, Self.chatAccent)
+            case "ear": listening ? drawSymbol("stop.fill", in: r, Self.chatRecRed)
+                                   : drawSymbol("ear", in: r, Self.chatAccent)
+            case "mic": micOn ? drawSymbol("stop.fill", in: r, Self.chatRecRed)
+                              : drawSymbol("mic.fill", in: r, Self.chatAccent)
             default:    drawText(icon, r.minX + 4, r.minY + 3, size: 12)
             }
             chatButtons.append(HudButton(id: id, icon: icon, rect: r))

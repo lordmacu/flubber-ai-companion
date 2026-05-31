@@ -46,5 +46,8 @@ public static class AgentTools
             new() { ["objetivo"] = Str("URL o nombre de app") }, new[] { "objetivo" }),
         Fn("ejecutar_comando", "Ejecuta un comando de shell en el equipo (pide confirmación al usuario).",
             new() { ["comando"] = Str("comando de PowerShell/cmd") }, new[] { "comando" }),
+        Fn("usar_microfono", "Empieza a escuchar y transcribir tu MICRÓFONO (tu voz) para luego resumir lo que dices en la reunión. Úsala cuando el usuario diga 'escucha', 'usa el micrófono' o 'transcribe lo que digo'.", new(), Array.Empty<string>()),
+        Fn("apagar_microfono", "Deja de escuchar el micrófono.", new(), Array.Empty<string>()),
+        Fn("resumen_reunion", "Devuelve la transcripción acumulada para que la resumas. Úsala cuando pidan un resumen de lo hablado.", new(), Array.Empty<string>()),
     };
 }
