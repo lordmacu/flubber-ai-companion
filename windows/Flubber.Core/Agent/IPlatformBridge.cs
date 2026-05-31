@@ -30,4 +30,9 @@ public interface IPlatformBridge
 
     /// <summary>Pide confirmación al usuario. Devuelve (aprobado, "permitir siempre").</summary>
     Task<(bool Ok, bool Always)> ConfirmAsync(string title, string detail);
+
+    // --- Escucha / transcripción (en Windows: micrófono vía dictado nativo) ---
+    Task<string> StartMicAsync();        // empieza a transcribir el micrófono
+    Task<string> StopMicAsync();         // deja de transcribir
+    string MeetingTranscript { get; }    // texto acumulado (para resumir)
 }

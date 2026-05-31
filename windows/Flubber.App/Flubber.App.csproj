@@ -25,4 +25,9 @@
     <ProjectReference Include="..\Flubber.Core\Flubber.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- mismo render que el icono de macOS, para la bandeja (idéntico en ambas plataformas) -->
+    <EmbeddedResource Include="trayicon.png" />
+  </ItemGroup>
+
 </Project>

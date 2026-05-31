@@ -33,6 +33,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSUIElement</key>             <true/>
     <key>NSHighResolutionCapable</key> <true/>
     <key>NSSpeechRecognitionUsageDescription</key> <string>Flubber transcribe el audio de tu reunión en el dispositivo para poder resumirla.</string>
+    <key>NSMicrophoneUsageDescription</key> <string>Flubber usa el micrófono para transcribir tu voz en la reunión y poder resumirla.</string>
     <key>NSAppSleepDisabled</key>      <true/>
 </dict>
 </plist>

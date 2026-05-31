@@ -2,7 +2,7 @@ using SkiaSharp;
 
 namespace Flubber.App.Rendering;
 
-public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead, Wiggling, Stretching }
+public enum SlimeState { Egg, Idle, Looking, Happy, Sleeping, Dragging, Dancing, Walking, Rolling, Falling, StuckWall, Dead, Wiggling, Stretching, Chasing, Dizzy, Yawning }
 public enum Expr { Normal, Sad, Sick }
 
 /// <summary>Estado de animación que consume el renderer (lo calcula PetWindow cada frame).</summary>
@@ -156,14 +156,22 @@ public sealed class SlimeRenderer
             for (var ox = 0; ox < 3; ox++) Fill(ex + ox, faceY + 3, Palette.Eye);
             for (var ox = 0; ox < 2; ox++) Fill(ex + ox, faceY + 1, Palette.Eye);
         }
+        void EyeDizzy(int ex)   // espiral "x"
+        {
+            Fill(ex, faceY + 2, Palette.Eye); Fill(ex + 2, faceY + 2, Palette.Eye);
+            Fill(ex + 1, faceY + 1, Palette.Eye); Fill(ex, faceY, Palette.Eye); Fill(ex + 2, faceY, Palette.Eye);
+        }
 
         // ojos según estado / ánimo
         switch (v.State)
         {
             case SlimeState.Sleeping:
+            case SlimeState.Yawning:
             case SlimeState.Stretching: EyeClosed(leftX); EyeClosed(rightX); break;
             case SlimeState.Happy:
+            case SlimeState.Chasing:
             case SlimeState.Wiggling: EyeHappy(leftX); EyeHappy(rightX); break;
+            case SlimeState.Dizzy: EyeDizzy(leftX); EyeDizzy(rightX); break;
             case SlimeState.Dragging:
             case SlimeState.Falling:
             case SlimeState.StuckWall: EyeSurprised(leftX); EyeSurprised(rightX); break;
@@ -183,10 +191,14 @@ public sealed class SlimeRenderer
         {
             for (var oy = 0; oy < 3; oy++) for (var ox = 0; ox < 2; ox++) Fill(cx - 1 + ox, faceY - 4 + oy, Palette.Mouth);
         }
-        else if (v.State is SlimeState.Happy or SlimeState.Dancing)
+        else if (v.State is SlimeState.Happy or SlimeState.Dancing or SlimeState.Chasing)
         {
             for (var ox = -2; ox <= 2; ox++) Fill(cx + ox, faceY - 3, Palette.Mouth);
             for (var ox = -1; ox <= 1; ox++) Fill(cx + ox, faceY - 4, Palette.Mouth);
+        }
+        else if (v.State == SlimeState.Yawning)   // boca abierta (bostezo)
+        {
+            for (var oy = 0; oy < 3; oy++) for (var ox = -1; ox <= 1; ox++) Fill(cx + ox, faceY - 5 + oy, Palette.Mouth);
         }
         else if (v.State == SlimeState.Sleeping) { /* sin boca */ }
         else if (v.Expr is Expr.Sad or Expr.Sick)

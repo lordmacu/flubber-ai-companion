@@ -133,8 +133,26 @@ final class Agent {
         case "detener_escucha":
             if #available(macOS 13.0, *) {
                 MeetingListener.shared.stop()
-                DispatchQueue.main.async { self.view?.listening = false }
+                DispatchQueue.main.async { self.view?.listening = false; self.view?.micOn = false }
                 completion(Loc.t("Dejé de escuchar 👂", "Stopped listening 👂"))
+            } else { completion("ok") }
+        case "usar_microfono":
+            if #available(macOS 13.0, *) {
+                let l = MeetingListener.shared
+                if l.micOn { completion(Loc.t("El micrófono ya está activo 🎤", "Mic already on 🎤")); return }
+                l.startMic { ok, err in
+                    DispatchQueue.main.async {
+                        self.view?.micOn = ok
+                        completion(ok ? Loc.t("Activé tu micrófono 🎤", "Turned on your mic 🎤")
+                                      : (err ?? Loc.t("No pude usar el micrófono.", "Couldn't use the mic.")))
+                    }
+                }
+            } else { completion(Loc.t("El micrófono requiere macOS 13+.", "Mic requires macOS 13+.")) }
+        case "apagar_microfono":
+            if #available(macOS 13.0, *) {
+                MeetingListener.shared.stopMic()
+                DispatchQueue.main.async { self.view?.micOn = false }
+                completion(Loc.t("Apagué el micrófono 🎤", "Mic off 🎤"))
             } else { completion("ok") }
         case "resumen_reunion":
             if #available(macOS 13.0, *) {
@@ -269,6 +287,8 @@ final class Agent {
         case "ejecutar_comando": return Loc.t("💻 quiere ejecutar un comando", "💻 wants to run a command")
         case "escuchar_reunion": return Loc.t("🎧 escuchando la reunión", "🎧 listening to the meeting")
         case "detener_escucha":  return Loc.t("⏹️ dejando de escuchar", "⏹️ stopping listening")
+        case "usar_microfono":   return Loc.t("🎤 activando tu micrófono", "🎤 turning on your mic")
+        case "apagar_microfono": return Loc.t("🎤 apagando el micrófono", "🎤 turning off the mic")
         case "resumen_reunion":  return Loc.t("📝 resumiendo la reunión", "📝 summarizing the meeting")
         default: return "🔧 \(c.name)"
         }
@@ -307,6 +327,8 @@ final class Agent {
            ["comando": ["type": "string", "description": "comando zsh"]], ["comando"]),
         fn("escuchar_reunion", "Empieza a escuchar el audio del sistema (la reunión de Meet/Teams/Zoom) y a transcribirlo EN EL DISPOSITIVO. Úsala cuando el usuario diga 'escucha la conversación/la reunión'.", [:], []),
         fn("detener_escucha", "Deja de escuchar la reunión.", [:], []),
+        fn("usar_microfono", "Activa el MICRÓFONO para que tu propia voz también entre en la transcripción de la reunión. Úsala si el usuario dice 'usa el micrófono' o 'incluye mi voz'.", [:], []),
+        fn("apagar_microfono", "Apaga el micrófono (deja de transcribir tu voz).", [:], []),
         fn("resumen_reunion", "Devuelve la transcripción acumulada de la reunión para que la resumas. Úsala cuando pidan un resumen de lo que se ha hablado.", [:], []),
     ]
 }
