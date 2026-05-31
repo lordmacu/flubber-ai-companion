@@ -25,7 +25,7 @@ public sealed class MicListener
     public string Transcript { get { lock (_lock) return _transcript; } }
     public string FullText { get { lock (_lock) return (_transcript + " " + _partial).Trim(); } }
 
-    private WasapiCapture? _capture;
+    private WaveInEvent? _capture;
     private BufferedWaveProvider? _buffered;
     private MediaFoundationResampler? _resampler;
     private SpeechStreamer? _speechStream;
@@ -39,8 +39,8 @@ public sealed class MicListener
         if (IsListening) return true;
         try
         {
-            Log.Write("🎤 mic.start — abriendo WasapiCapture (micrófono)…");
-            _capture = new WasapiCapture();   // dispositivo de entrada por defecto (mic)
+            Log.Write("🎤 mic.start — abriendo WaveInEvent (micrófono)…");
+            _capture = new WaveInEvent { WaveFormat = new WaveFormat(44100, 16, 1) };   // mic por defecto, PCM 44.1kHz/16/mono
             _buffered = new BufferedWaveProvider(_capture.WaveFormat)
             {
                 ReadFully = false,
