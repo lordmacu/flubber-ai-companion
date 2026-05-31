@@ -1,5 +1,6 @@
 using System.Speech.AudioFormat;
 using System.Speech.Recognition;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Flubber.Core.Util;
 
