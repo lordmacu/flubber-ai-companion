@@ -8,13 +8,14 @@
 
 > ▶️ [Watch the full-quality video](https://github.com/lordmacu/flubber-ai-companion/raw/main/flubber.mp4).
 
-# 🟢 Flubber — AI slime pet for macOS
+# 🟢 Flubber — AI slime pet for macOS & Windows
 
-Flubber is a pixel-art **desktop pet** for macOS, built 100% in **Swift + AppKit**
-(no image files: all the art is drawn in code). It's not just an ornament: it's a
-**Tamagotchi** that lives in real time **and** an **AI agent** that can search the
-web, see your screen, control your browser and run actions — all by chatting with
-it in a built-in chat.
+Flubber is a pixel-art **desktop pet** for **macOS & Windows**, built 100% in native
+code (Swift + AppKit on macOS, C#/.NET WPF on Windows — no image files, all the art
+is drawn in code). It's not just an ornament: it's a **Tamagotchi** that lives in
+real time **and** an **AI agent** that can search the web, see your screen, control
+your browser, **listen to your meetings and summarize them**, and run actions — all
+by chatting with it in a built-in chat.
 
 [![Build Flubber](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml/badge.svg)](https://github.com/lordmacu/flubber-ai-companion/actions/workflows/build.yml) [![Download](https://img.shields.io/github/v/release/lordmacu/flubber-ai-companion?label=download&color=brightgreen)](https://github.com/lordmacu/flubber-ai-companion/releases/latest) ![macOS](https://img.shields.io/badge/macOS-12%2B-blue) ![Swift](https://img.shields.io/badge/Swift-AppKit-orange)
 
@@ -75,9 +76,10 @@ its state and computes the elapsed time when you reopen).
 
 It walks across the screen, **looks at the cursor**, jumps when clicked, drops
 hearts on double-click, dances 💃, rolls 🤸 (and gets dizzy), chases the cursor,
-yawns, sleeps with "Z", blushes, and reacts with faces based on its mood (sad,
-sick, happy…).
+**wiggles**, **stretches**, yawns, sleeps with "Z", blushes, and reacts with faces
+based on its mood (sad, sick, happy…). It springs these on its own while idle.
 
+- **Trigger any of them** from the **right-click → Animations 🎭** submenu (Walk, Chase, Dance, Roll, Jump, Wiggle, Stretch, Spin, Yawn) — identical on macOS and Windows.
 - **Physics:** it can't leave the screen; if you drag it against an edge and let go, it **sticks to the wall and slides** down to the bottom 🫧.
 - While it "works" in the chat, it animates in place: **it sways while searching**, **turns its back while looking at your screen**, **moves its mouth while talking** and pulses while thinking.
 
@@ -161,6 +163,23 @@ facts with tools**, cite sources, and admit when it doesn't know.
 - This stealth is a **toggle** in the 🟢 menu — **"Hide from captures/recordings 🕵️"** — and it's **enabled by default**. Turn it off if you'd rather have Flubber show up in screenshots and shared screens.
 - The capture is optimized to **JPEG** before sending (lighter).
 - The capture is shown as a **thumbnail** in the chat (click to open); you can attach one manually with 👁️ and remove it with the ✕.
+
+### 🎧 Listen to meetings (transcribe & summarize)
+
+Press the **👂 ear** (chat panel / menu) and Flubber starts **transcribing on-device**
+what's being said:
+
+- **Captures the system audio** — what you hear from the others in a Meet/Zoom/Teams
+  call (your own mic stays separate; there's an optional **🎤 microphone** source too).
+- **Rolling summaries**: every few minutes it jots down a short note of what's new, so
+  long meetings never send a giant prompt to the AI.
+- **On stop** it tells you in the chat: a **meeting summary** (recap + key points + action
+  items) if it lasted ≥1 min, or just a short recap for a quick chat. Each session is a
+  **new conversation**.
+- Saves the **full transcript** to a `.txt` with a **clickable link** in the chat. Without
+  an AI key it still shows the raw transcript.
+- While listening, Flubber sprouts **little ears** and stays attentive. 👂
+- On-device transcription: **Speech.framework** (macOS) / **System.Speech** (Windows).
 
 ---
 

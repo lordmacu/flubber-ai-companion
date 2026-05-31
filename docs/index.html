@@ -35,7 +35,7 @@
   "description": "Flubber is a pixel-art AI slime desktop pet for macOS and Windows: a real-time Tamagotchi plus an AI agent that sees your screen, controls your browser and chats, and stays invisible in screenshots and screen shares.",
   "url": "https://lordmacu.github.io/flubber-ai-companion/",
   "downloadUrl": "https://github.com/lordmacu/flubber-ai-companion/releases/latest",
-  "softwareVersion": "1.3.0",
+  "softwareVersion": "1.5.0",
   "image": "https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/icon.png",
   "screenshot": "https://raw.githubusercontent.com/lordmacu/flubber-ai-companion/main/docs/chat.png",
   "author": { "@type": "Person", "name": "Cristian Garcia" },
@@ -45,6 +45,7 @@
     "Real-time Tamagotchi (hunger, energy, happiness, cleanliness, health)",
     "AI agent with streaming chat and tools",
     "Screen capture and vision (see what's on your screen)",
+    "Listen to meetings and transcribe & summarize them on-device",
     "Browser control via Chrome DevTools Protocol",
     "Invisible in screenshots and screen shares",
     "Pixel-art rendering drawn entirely in code",
@@ -61,6 +62,7 @@
     { "@type": "Question", "name": "Is Flubber really invisible during screen sharing?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Flubber's window is excluded from screenshots, screen recordings and screen sharing (Google Meet, Zoom, QuickTime) by default, using WDA_EXCLUDEFROMCAPTURE on Windows and sharingType on macOS. You can toggle it off anytime." } },
     { "@type": "Question", "name": "Which platforms does Flubber support?", "acceptedAnswer": { "@type": "Answer", "text": "macOS 12 or newer and Windows 10/11. The macOS app is built in Swift/AppKit; the Windows app is a C#/.NET (WPF) port with functional parity." } },
     { "@type": "Question", "name": "Which AI providers does Flubber work with?", "acceptedAnswer": { "@type": "Answer", "text": "Flubber is designed primarily for MiniMax but also works with Claude (Anthropic), ChatGPT (OpenAI) and DeepSeek. Without an API key it still runs with canned phrases." } },
+    { "@type": "Question", "name": "Can Flubber transcribe and summarize meetings?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Press the ear and Flubber transcribes the meeting on-device (Speech.framework on macOS, System.Speech on Windows), writes rolling summaries during the call, and on stop gives you a recap with key points and action items plus the full transcript saved to a file. Without an AI key it still shows the raw transcript." } },
     { "@type": "Question", "name": "Is Flubber free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, Flubber is completely free and open source on GitHub." } }
   ]
 }
@@ -197,6 +199,7 @@
       <div class="card"><div class="e">🐹</div><h3>Real Tamagotchi</h3><p>Hunger, energy, happiness, cleanliness and health decay in real time — even when closed. It grows from egg to adult, can get sick, and needs care.</p></div>
       <div class="card"><div class="e">🧠</div><h3>AI agent</h3><p>Chat with it in a built-in panel with real token-by-token streaming. It uses tools: web search, read pages, weather, reminders and more.</p></div>
       <div class="card"><div class="e">👁️</div><h3>Sees your screen</h3><p>Ask “what's on my screen?” and it captures and analyzes it — the whole desktop or just one app.</p></div>
+      <div class="card"><div class="e">🎧</div><h3>Listens to meetings</h3><p>Press the ear and it transcribes your call <b>on-device</b>, writes rolling summaries, and on stop gives you a recap with key points and action items — plus the full transcript.</p></div>
       <div class="card"><div class="e">🌐</div><h3>Controls your browser</h3><p>Reads the active tab and runs JavaScript to extract text, click, fill forms or navigate (Chrome / Edge / Brave / Safari).</p></div>
       <div class="card"><div class="e">🕵️</div><h3>Invisible on capture</h3><p>Excluded from screenshots and screen sharing by default, with a one-click toggle. Your recordings stay clean.</p></div>
       <div class="card"><div class="e">🎨</div><h3>Pixel-art &amp; skins</h3><p>Walks, blinks, dances, follows your cursor. Change its color or ask the AI to design a skin by theme (“lava”, “galaxy”).</p></div>
@@ -232,6 +235,7 @@
       <details><summary>Is Flubber really invisible during screen sharing?</summary><p>Yes. Flubber's window is excluded from screenshots, screen recordings and screen sharing (Google Meet, Zoom, QuickTime) by default — using <code>WDA_EXCLUDEFROMCAPTURE</code> on Windows and window <code>sharingType</code> on macOS. There's a one-click toggle to turn it off.</p></details>
       <details><summary>Which platforms does Flubber support?</summary><p>macOS 12+ and Windows 10/11. The macOS app is built in Swift/AppKit; the Windows app is a C#/.NET (WPF) port with functional parity.</p></details>
       <details><summary>Which AI providers does it work with?</summary><p>Designed primarily for <strong>MiniMax</strong>, and also compatible with <strong>Claude</strong> (Anthropic), <strong>ChatGPT</strong> (OpenAI) and <strong>DeepSeek</strong>. Without an API key it still runs with canned phrases.</p></details>
+      <details><summary>Can Flubber transcribe and summarize meetings?</summary><p>Yes. Press the 👂 ear and Flubber transcribes the call <strong>on-device</strong> (Speech.framework on macOS, System.Speech on Windows), writes rolling summaries during the meeting, and on stop gives you a recap with key points and action items — plus the full transcript saved to a file. Without an AI key it still shows the raw transcript.</p></details>
       <details><summary>Is Flubber free?</summary><p>Yes — completely free and open source on <a href="https://github.com/lordmacu/flubber-ai-companion">GitHub</a>.</p></details>
     </div>
   </div>
