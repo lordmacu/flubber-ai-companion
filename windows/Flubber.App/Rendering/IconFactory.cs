@@ -1,30 +1,32 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 using Flubber.App.Interop;
-using SkiaSharp;
 
 namespace Flubber.App.Rendering;
 
-/// <summary>Renderiza el slime a un System.Drawing.Icon para la bandeja del sistema.</summary>
+/// <summary>
+/// Icono de la bandeja. Carga trayicon.png (embebido), que es EXACTAMENTE el mismo
+/// render pixel-art que el icono de macOS (icon/make-icon.swift) → icono idéntico
+/// en ambas plataformas. Se regenera con windows/gen-icon.sh.
+/// </summary>
 public static class IconFactory
 {
     public static Icon SlimeTrayIcon(int size = 32)
     {
         try
         {
-            var view = new SlimeView { State = SlimeState.Happy, Skin = Palette.Skins[0], SizeScale = 1 };
-            var info = new SKImageInfo(size, size, SKColorType.Bgra8888, SKAlphaType.Unpremul);
-            using var sk = new SKBitmap(info);
-            using (var canvas = new SKCanvas(sk))
-                new SlimeRenderer().Draw(canvas, size, size, view);
-
+            var asm = typeof(IconFactory).Assembly;
+            using var stream = asm.GetManifestResourceStream("Flubber.App.trayicon.png")
+                ?? throw new InvalidOperationException("trayicon.png no embebido");
+            using var src = new Bitmap(stream);
             using var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
-            var rect = new Rectangle(0, 0, size, size);
-            var bd = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-            Marshal.Copy(sk.Bytes, 0, bd.Scan0, sk.Bytes.Length);
-            bmp.UnlockBits(bd);
-
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.DrawImage(src, new Rectangle(0, 0, size, size));
+            }
             var hicon = bmp.GetHicon();
             try { return (Icon)Icon.FromHandle(hicon).Clone(); }
             finally { Native.DestroyIcon(hicon); }
