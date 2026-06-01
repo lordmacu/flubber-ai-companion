@@ -17,8 +17,9 @@ public sealed class SettingsWindow : Window
 
     private static readonly (string Id, string Label)[] Providers =
     {
-        ("minimax", "MiniMax (recomendado)"), ("claude", "Claude (Anthropic)"),
-        ("openai", "ChatGPT (OpenAI)"), ("deepseek", "DeepSeek"),
+        ("kilo", "Kilo (gratis, sin clave)"), ("minimax", "MiniMax (recomendado)"),
+        ("claude", "Claude (Anthropic)"), ("openai", "ChatGPT (OpenAI)"),
+        ("deepseek", "DeepSeek"), ("openrouter", "OpenRouter (gratis)"),
     };
 
     public bool Saved { get; private set; }
@@ -71,6 +72,8 @@ public sealed class SettingsWindow : Window
             "claude" => (_cfg.ClaudeKey ?? "", _cfg.ClaudeModel ?? "claude-haiku-4-5-20251001"),
             "openai" => (_cfg.OpenaiKey ?? "", _cfg.OpenaiModel ?? "gpt-4o"),
             "deepseek" => (_cfg.DeepseekKey ?? "", _cfg.DeepseekModel ?? "deepseek-chat"),
+            "openrouter" => (_cfg.OpenrouterKey ?? "", _cfg.OpenrouterModel ?? "minimax/minimax-m2.5:free"),
+            "kilo" => (_cfg.KiloKey ?? "", _cfg.KiloModel ?? "poolside/laguna-m.1:free"),
             _ => (_cfg.ApiKey, string.IsNullOrEmpty(_cfg.Model) ? "MiniMax-M2.5" : _cfg.Model),
         };
         _key.Text = key;
@@ -87,6 +90,8 @@ public sealed class SettingsWindow : Window
             case "claude": c.ClaudeKey = _key.Text.Trim(); c.ClaudeModel = _model.Text.Trim(); break;
             case "openai": c.OpenaiKey = _key.Text.Trim(); c.OpenaiModel = _model.Text.Trim(); break;
             case "deepseek": c.DeepseekKey = _key.Text.Trim(); c.DeepseekModel = _model.Text.Trim(); break;
+            case "openrouter": c.OpenrouterKey = _key.Text.Trim(); c.OpenrouterModel = _model.Text.Trim(); break;
+            case "kilo": c.KiloKey = _key.Text.Trim(); c.KiloModel = _model.Text.Trim(); break;
             default: c.ApiKey = _key.Text.Trim(); c.Model = _model.Text.Trim(); break;
         }
         return c;
@@ -99,6 +104,8 @@ public sealed class SettingsWindow : Window
             "claude" => "https://console.anthropic.com/settings/keys",
             "openai" => "https://platform.openai.com/api-keys",
             "deepseek" => "https://platform.deepseek.com/api_keys",
+            "openrouter" => "https://openrouter.ai/keys",
+            "kilo" => "https://app.kilo.ai/api-keys",
             _ => "https://platform.minimax.io",
         };
         try { Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true }); } catch { }
@@ -125,6 +132,8 @@ public sealed class SettingsWindow : Window
             case "claude": _cfg.ClaudeKey = _key.Text.Trim(); _cfg.ClaudeModel = _model.Text.Trim(); break;
             case "openai": _cfg.OpenaiKey = _key.Text.Trim(); _cfg.OpenaiModel = _model.Text.Trim(); break;
             case "deepseek": _cfg.DeepseekKey = _key.Text.Trim(); _cfg.DeepseekModel = _model.Text.Trim(); break;
+            case "openrouter": _cfg.OpenrouterKey = _key.Text.Trim(); _cfg.OpenrouterModel = _model.Text.Trim(); break;
+            case "kilo": _cfg.KiloKey = _key.Text.Trim(); _cfg.KiloModel = _model.Text.Trim(); break;
             default: _cfg.ApiKey = _key.Text.Trim(); _cfg.Model = _model.Text.Trim(); break;
         }
         _cfg.Save();

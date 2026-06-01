@@ -10,7 +10,7 @@ namespace Flubber.Core.AI;
 /// </summary>
 public sealed class AIConfig
 {
-    public string Provider { get; set; } = "minimax";   // "minimax" | "claude" | "openai" | "deepseek"
+    public string Provider { get; set; } = "kilo";   // "kilo" | "minimax" | "claude" | "openai" | "deepseek" | "openrouter"
 
     // MiniMax
     public string ApiKey { get; set; } = "";
@@ -28,6 +28,14 @@ public sealed class AIConfig
     // DeepSeek
     public string? DeepseekKey { get; set; }
     public string? DeepseekModel { get; set; }
+
+    // OpenRouter (aggregator — OpenAI-compatible). Free models end in ":free".
+    public string? OpenrouterKey { get; set; }
+    public string? OpenrouterModel { get; set; }
+
+    // Kilo Gateway (OpenAI-compatible). Free models work anonymously (no key); a key raises the limits.
+    public string? KiloKey { get; set; }
+    public string? KiloModel { get; set; }
 
     public string? Lang { get; set; }   // null=system, "es", "en"
 
@@ -49,17 +57,23 @@ public sealed class AIConfig
     [JsonIgnore] public string OpenaiModelValue => !string.IsNullOrEmpty(OpenaiModel) ? OpenaiModel! : "gpt-4o";
     [JsonIgnore] public string DeepseekKeyValue => DeepseekKey ?? "";
     [JsonIgnore] public string DeepseekModelValue => !string.IsNullOrEmpty(DeepseekModel) ? DeepseekModel! : "deepseek-chat";
+    [JsonIgnore] public string OpenrouterKeyValue => OpenrouterKey ?? "";
+    [JsonIgnore] public string OpenrouterModelValue => !string.IsNullOrEmpty(OpenrouterModel) ? OpenrouterModel! : "minimax/minimax-m2.5:free";
+    [JsonIgnore] public string KiloKeyValue => KiloKey ?? "";
+    [JsonIgnore] public string KiloModelValue => !string.IsNullOrEmpty(KiloModel) ? KiloModel! : "poolside/laguna-m.1:free";
 
     [JsonIgnore]
     public bool IsConfigured
     {
         get
         {
+            if (Provider == "kilo") return true;   // Kilo Gateway: free anonymous tier works without a key
             var k = Provider switch
             {
                 "claude" => ClaudeKeyValue,
                 "openai" => OpenaiKeyValue,
                 "deepseek" => DeepseekKeyValue,
+                "openrouter" => OpenrouterKeyValue,
                 _ => ApiKey,
             };
             return !string.IsNullOrWhiteSpace(k);
@@ -93,6 +107,8 @@ public sealed class AIConfig
                     c.ClaudeKey = DecN(c.ClaudeKey);
                     c.OpenaiKey = DecN(c.OpenaiKey);
                     c.DeepseekKey = DecN(c.DeepseekKey);
+                    c.OpenrouterKey = DecN(c.OpenrouterKey);
+                    c.KiloKey = DecN(c.KiloKey);
                     return c;
                 }
             }
@@ -111,6 +127,8 @@ public sealed class AIConfig
             clone.ClaudeKey = EncN(ClaudeKey);
             clone.OpenaiKey = EncN(OpenaiKey);
             clone.DeepseekKey = EncN(DeepseekKey);
+            clone.OpenrouterKey = EncN(OpenrouterKey);
+            clone.KiloKey = EncN(KiloKey);
             System.IO.File.WriteAllText(Paths.ConfigJson, JsonSerializer.Serialize(clone, JsonOpts));
         }
         catch { /* ignore */ }

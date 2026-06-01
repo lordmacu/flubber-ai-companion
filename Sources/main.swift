@@ -2600,20 +2600,24 @@ final class ConfigController: NSObject, NSWindowDelegate {
     let onSave: (AIConfig) -> Void
 
     private var providerPopup: NSPopUpButton!
-    private var mmBox: NSView!, clBox: NSView!, oaBox: NSView!, dsBox: NSView!
-    private var mmKeyField: NSSecureTextField!, clKeyField: NSSecureTextField!
-    private var oaKeyField: NSSecureTextField!, dsKeyField: NSSecureTextField!
-    private var mmModelPopup: NSPopUpButton!, clModelPopup: NSPopUpButton!
-    private var oaModelPopup: NSPopUpButton!, dsModelPopup: NSPopUpButton!
+    private var kiBox: NSView!, mmBox: NSView!, clBox: NSView!, oaBox: NSView!, dsBox: NSView!, orBox: NSView!
+    private var kiKeyField: NSSecureTextField!, mmKeyField: NSSecureTextField!, clKeyField: NSSecureTextField!
+    private var oaKeyField: NSSecureTextField!, dsKeyField: NSSecureTextField!, orKeyField: NSSecureTextField!
+    private var kiModelPopup: NSPopUpButton!, mmModelPopup: NSPopUpButton!, clModelPopup: NSPopUpButton!
+    private var oaModelPopup: NSPopUpButton!, dsModelPopup: NSPopUpButton!, orModelPopup: NSPopUpButton!
     private var statusLabel: NSTextField!
 
-    // provider order in the popup
-    private let providers = ["minimax", "claude", "openai", "deepseek"]
+    // provider order in the popup (Kilo first = free default)
+    private let providers = ["kilo", "minimax", "claude", "openai", "deepseek", "openrouter"]
+    private let kiTitles = ["Laguna (gratis, recomendado)", "Laguna XS (gratis)", "Auto (variable)"]
+    private let kiValues = ["poolside/laguna-m.1:free", "poolside/laguna-xs.2:free", "kilo-auto/free"]
     private let mmTitles = ["MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2"]
     private let clTitles = ["Haiku 4.5 (económico)", "Sonnet 4.6", "Opus 4.8"]
     private let clValues = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"]
     private let oaModels = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"]
     private let dsModels = ["deepseek-chat", "deepseek-reasoner"]
+    private let orTitles = ["MiniMax M2.5 (gratis)", "MiniMax M2.5 (de pago)", "MiniMax M2.7 (de pago)"]
+    private let orValues = ["minimax/minimax-m2.5:free", "minimax/minimax-m2.5", "minimax/minimax-m2.7"]
     private func provIndex() -> Int { providerPopup.indexOfSelectedItem }
 
     init(config: AIConfig, onSave: @escaping (AIConfig) -> Void) {
@@ -2641,7 +2645,7 @@ final class ConfigController: NSObject, NSWindowDelegate {
 
         c.addSubview(label("Proveedor:", 20, H-64, 90))
         providerPopup = NSPopUpButton(frame: NSRect(x: 110, y: H-68, width: 200, height: 26))
-        providerPopup.addItems(withTitles: ["MiniMax", "Claude (Anthropic)", "ChatGPT (OpenAI)", "DeepSeek"])
+        providerPopup.addItems(withTitles: ["Kilo (gratis, sin clave)", "MiniMax", "Claude (Anthropic)", "ChatGPT (OpenAI)", "DeepSeek", "OpenRouter (gratis)"])
         providerPopup.target = self; providerPopup.action = #selector(providerChanged)
         c.addSubview(providerPopup)
 
@@ -2650,14 +2654,24 @@ final class ConfigController: NSObject, NSWindowDelegate {
 
         // The sections occupy the same space; only the active provider's is visible.
         let boxFrame = NSRect(x: 20, y: 110, width: W-40, height: 110)
-        mmBox = NSView(frame: boxFrame); clBox = NSView(frame: boxFrame)
-        oaBox = NSView(frame: boxFrame); dsBox = NSView(frame: boxFrame)
-        c.addSubview(mmBox); c.addSubview(clBox); c.addSubview(oaBox); c.addSubview(dsBox)
+        kiBox = NSView(frame: boxFrame); mmBox = NSView(frame: boxFrame); clBox = NSView(frame: boxFrame)
+        oaBox = NSView(frame: boxFrame); dsBox = NSView(frame: boxFrame); orBox = NSView(frame: boxFrame)
+        c.addSubview(kiBox); c.addSubview(mmBox); c.addSubview(clBox); c.addSubview(oaBox); c.addSubview(dsBox); c.addSubview(orBox)
 
         func boxLabel(_ s: String, _ y: CGFloat, bold: Bool = false) -> NSTextField {
             let l = NSTextField(labelWithString: s); l.frame = NSRect(x: 0, y: y, width: boxFrame.width, height: 18)
             if bold { l.font = NSFont.boldSystemFont(ofSize: 12) }; l.textColor = .secondaryLabelColor; return l
         }
+
+        // Kilo Gateway (gratis, sin clave). Clave opcional para más límites.
+        kiBox.addSubview(boxLabel("Gratis sin clave (~200 mensajes/hora). Opcional: pega tu clave de Kilo para más.", 88, bold: true))
+        kiKeyField = PastableSecureTextField(frame: NSRect(x: 0, y: 58, width: boxFrame.width, height: 24))
+        kiKeyField.placeholderString = "clave de Kilo (opcional, ⌘V para pegar)"; kiBox.addSubview(kiKeyField)
+        let kiModelLbl = boxLabel("Modelo:", 26); kiModelLbl.frame.size.width = 64; kiBox.addSubview(kiModelLbl)
+        kiModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 220, height: 26))
+        kiModelPopup.addItems(withTitles: kiTitles); kiBox.addSubview(kiModelPopup)
+        let kiNote = boxLabel("⚠︎ Gratis puede registrar tus mensajes; no envíes datos sensibles. (Sin visión de imágenes.)", 2)
+        kiNote.font = NSFont.systemFont(ofSize: 10); kiBox.addSubview(kiNote)
 
         // MiniMax
         mmBox.addSubview(boxLabel("Clave de MiniMax (Token Plan):", 88, bold: true))
@@ -2691,6 +2705,14 @@ final class ConfigController: NSObject, NSWindowDelegate {
         dsModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 220, height: 26))
         dsModelPopup.addItems(withTitles: dsModels); dsBox.addSubview(dsModelPopup)
 
+        // OpenRouter (modelos gratis; agregador OpenAI-compatible)
+        orBox.addSubview(boxLabel("Clave de OpenRouter (sk-or-…) — modelos :free gratis:", 88, bold: true))
+        orKeyField = PastableSecureTextField(frame: NSRect(x: 0, y: 58, width: boxFrame.width, height: 24))
+        orKeyField.placeholderString = "clave de OpenRouter (⌘V para pegar)"; orBox.addSubview(orKeyField)
+        let orModelLbl = boxLabel("Modelo:", 26); orModelLbl.frame.size.width = 64; orBox.addSubview(orModelLbl)
+        orModelPopup = NSPopUpButton(frame: NSRect(x: 70, y: 22, width: 280, height: 26))
+        orModelPopup.addItems(withTitles: orTitles); orBox.addSubview(orModelPopup)
+
         statusLabel = NSTextField(labelWithString: "")
         statusLabel.frame = NSRect(x: 20, y: 60, width: W-40, height: 40)
         statusLabel.textColor = .secondaryLabelColor; statusLabel.maximumNumberOfLines = 2
@@ -2708,13 +2730,16 @@ final class ConfigController: NSObject, NSWindowDelegate {
 
     private func updateVisibility() {
         let i = provIndex()
-        mmBox.isHidden = i != 0; clBox.isHidden = i != 1; oaBox.isHidden = i != 2; dsBox.isHidden = i != 3
+        kiBox.isHidden = i != 0; mmBox.isHidden = i != 1; clBox.isHidden = i != 2
+        oaBox.isHidden = i != 3; dsBox.isHidden = i != 4; orBox.isHidden = i != 5
     }
 
     @objc private func providerChanged() { updateVisibility() }
 
     func show() {
         providerPopup.selectItem(at: max(0, providers.firstIndex(of: config.provider) ?? 0))
+        kiKeyField.stringValue = config.kiloKeyValue
+        kiModelPopup.selectItem(at: kiValues.firstIndex(of: config.kiloModelValue) ?? 0)
         mmKeyField.stringValue = config.apiKey
         mmModelPopup.selectItem(withTitle: config.model); if mmModelPopup.indexOfSelectedItem < 0 { mmModelPopup.selectItem(at: 1) }
         clKeyField.stringValue = config.claudeKeyValue
@@ -2723,6 +2748,8 @@ final class ConfigController: NSObject, NSWindowDelegate {
         oaModelPopup.selectItem(withTitle: config.openaiModelValue); if oaModelPopup.indexOfSelectedItem < 0 { oaModelPopup.selectItem(at: 0) }
         dsKeyField.stringValue = config.deepseekKeyValue
         dsModelPopup.selectItem(withTitle: config.deepseekModelValue); if dsModelPopup.indexOfSelectedItem < 0 { dsModelPopup.selectItem(at: 0) }
+        orKeyField.stringValue = config.openrouterKeyValue
+        orModelPopup.selectItem(at: orValues.firstIndex(of: config.openrouterModelValue) ?? 0)
         statusLabel.stringValue = config.isConfigured ? "Configurado ✅" : "Falta la clave del proveedor elegido."
         updateVisibility()
         NSApp.activate(ignoringOtherApps: true)
@@ -2732,6 +2759,8 @@ final class ConfigController: NSObject, NSWindowDelegate {
     private func current() -> AIConfig {
         var c = config
         c.provider = providers[min(provIndex(), providers.count - 1)]
+        c.kiloKey = kiKeyField.stringValue.isEmpty ? nil : kiKeyField.stringValue
+        c.kiloModel = kiValues[min(max(0, kiModelPopup.indexOfSelectedItem), kiValues.count - 1)]
         c.apiKey = mmKeyField.stringValue
         c.model = mmModelPopup.titleOfSelectedItem ?? "MiniMax-M2.5"
         c.claudeKey = clKeyField.stringValue.isEmpty ? nil : clKeyField.stringValue
@@ -2740,15 +2769,19 @@ final class ConfigController: NSObject, NSWindowDelegate {
         c.openaiModel = oaModelPopup.titleOfSelectedItem
         c.deepseekKey = dsKeyField.stringValue.isEmpty ? nil : dsKeyField.stringValue
         c.deepseekModel = dsModelPopup.titleOfSelectedItem
+        c.openrouterKey = orKeyField.stringValue.isEmpty ? nil : orKeyField.stringValue
+        c.openrouterModel = orValues[min(max(0, orModelPopup.indexOfSelectedItem), orValues.count - 1)]
         return c
     }
 
     @objc private func openConsole() {
         let url: String
         switch provIndex() {
-        case 1: url = "https://console.anthropic.com/settings/keys"
-        case 2: url = "https://platform.openai.com/api-keys"
-        case 3: url = "https://platform.deepseek.com/api_keys"
+        case 0: url = "https://app.kilo.ai/api-keys"
+        case 2: url = "https://console.anthropic.com/settings/keys"
+        case 3: url = "https://platform.openai.com/api-keys"
+        case 4: url = "https://platform.deepseek.com/api_keys"
+        case 5: url = "https://openrouter.ai/keys"
         default: url = "https://platform.minimax.io/user-center/basic-information/interface-key"
         }
         if let u = URL(string: url) { NSWorkspace.shared.open(u) }

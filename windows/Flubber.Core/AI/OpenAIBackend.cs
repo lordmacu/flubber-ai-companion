@@ -11,16 +11,54 @@ public sealed class OpenAIBackend : IAIBackend
     public OpenAIBackend(AIConfig config) { Config = config; }
 
     private bool IsOpenAI => Config.Provider == "openai";
-    private string Base => IsOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com";
-    private string Key => IsOpenAI ? Config.OpenaiKeyValue : Config.DeepseekKeyValue;
-    private string Model => IsOpenAI ? Config.OpenaiModelValue : Config.DeepseekModelValue;
-    private string Name => IsOpenAI ? "OpenAI" : "DeepSeek";
+    private bool IsOpenRouter => Config.Provider == "openrouter";
+    private bool IsKilo => Config.Provider == "kilo";
+    private string Base => Config.Provider switch
+    {
+        "openai" => "https://api.openai.com/v1",
+        "openrouter" => "https://openrouter.ai/api/v1",
+        "kilo" => "https://api.kilo.ai/api/gateway",
+        _ => "https://api.deepseek.com",   // deepseek
+    };
+    private string Key => Config.Provider switch
+    {
+        "openai" => Config.OpenaiKeyValue,
+        "openrouter" => Config.OpenrouterKeyValue,
+        "kilo" => Config.KiloKeyValue,   // may be empty → anonymous
+        _ => Config.DeepseekKeyValue,
+    };
+    private string Model => Config.Provider switch
+    {
+        "openai" => Config.OpenaiModelValue,
+        "openrouter" => Config.OpenrouterModelValue,
+        "kilo" => Config.KiloModelValue,
+        _ => Config.DeepseekModelValue,
+    };
+    private string Name => Config.Provider switch
+    {
+        "openai" => "OpenAI",
+        "openrouter" => "OpenRouter",
+        "kilo" => "Kilo",
+        _ => "DeepSeek",
+    };
     private string ChatURL => Base + "/chat/completions";
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Key);
-    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek still uses max_tokens.
+    // Kilo's free tier works anonymously (no key); the others require one.
+    public bool IsConfigured => IsKilo || !string.IsNullOrWhiteSpace(Key);
+    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek/OpenRouter/Kilo use the standard max_tokens.
     private string TokenParam => IsOpenAI ? "max_completion_tokens" : "max_tokens";
 
-    private IEnumerable<(string, string)> Headers() => new (string, string)[] { ("Authorization", "Bearer " + Key) };
+    private IEnumerable<(string, string)> Headers()
+    {
+        var h = new List<(string, string)>();
+        if (!string.IsNullOrWhiteSpace(Key)) h.Add(("Authorization", "Bearer " + Key));   // Kilo anonymous has no key
+        if (IsOpenRouter)
+        {
+            // Optional headers so the app is identified on OpenRouter's leaderboard.
+            h.Add(("HTTP-Referer", "https://github.com/lordmacu/SlimePet"));
+            h.Add(("X-Title", "Flubber"));
+        }
+        return h;
+    }
 
     private List<object> OaiMessages(IReadOnlyList<AIMessage> messages)
     {
@@ -147,7 +185,7 @@ public sealed class OpenAIBackend : IAIBackend
 
     public async Task<string?> VisionAsync(string prompt, string imageBase64)
     {
-        if (!IsConfigured || !IsOpenAI) return null;   // DeepSeek has no vision
+        if (!IsConfigured || !(IsOpenAI || IsOpenRouter || IsKilo)) return null;   // DeepSeek has no vision; OpenRouter/Kilo depend on the model
         var body = new Dictionary<string, object?>
         {
             ["model"] = Model, [TokenParam] = 1024, ["temperature"] = 0.2,

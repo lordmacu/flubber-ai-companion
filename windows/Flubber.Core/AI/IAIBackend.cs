@@ -19,7 +19,7 @@ public static class BackendFactory
     // claude/minimax → Anthropic Messages format; openai/deepseek → OpenAI Chat Completions.
     public static IAIBackend Make(AIConfig config) => config.Provider switch
     {
-        "openai" or "deepseek" => new OpenAIBackend(config),
+        "openai" or "deepseek" or "openrouter" or "kilo" => new OpenAIBackend(config),
         _ => new AnthropicBackend(config),
     };
 }

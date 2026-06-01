@@ -85,7 +85,7 @@ struct SkinSpec: Codable {
 // MARK: - Configuration
 
 struct AIConfig: Codable {
-    var provider: String = "minimax"          // "minimax" | "claude"
+    var provider: String = "kilo"             // "kilo" | "minimax" | "claude" | "openai" | "deepseek" | "openrouter"
     // MiniMax
     var apiKey: String = ""
     var model: String = "MiniMax-M2.5"
@@ -99,6 +99,12 @@ struct AIConfig: Codable {
     // DeepSeek
     var deepseekKey: String? = nil
     var deepseekModel: String? = nil
+    // OpenRouter (aggregator — OpenAI-compatible). Free models end in ":free".
+    var openrouterKey: String? = nil
+    var openrouterModel: String? = nil
+    // Kilo Gateway (OpenAI-compatible). Free models work anonymously (no key); a key raises the limits.
+    var kiloKey: String? = nil
+    var kiloModel: String? = nil
     var lang: String? = nil                   // nil=system, "es", "en"
     // "always allow" per category (don't ask again)
     var allowBrowser: Bool? = nil
@@ -118,13 +124,19 @@ struct AIConfig: Codable {
     var openaiModelValue: String { (openaiModel?.isEmpty == false) ? openaiModel! : "gpt-4o" }
     var deepseekKeyValue: String { deepseekKey ?? "" }
     var deepseekModelValue: String { (deepseekModel?.isEmpty == false) ? deepseekModel! : "deepseek-chat" }
+    var openrouterKeyValue: String { openrouterKey ?? "" }
+    var openrouterModelValue: String { (openrouterModel?.isEmpty == false) ? openrouterModel! : "minimax/minimax-m2.5:free" }
+    var kiloKeyValue: String { kiloKey ?? "" }
+    var kiloModelValue: String { (kiloModel?.isEmpty == false) ? kiloModel! : "poolside/laguna-m.1:free" }
 
     var isConfigured: Bool {
         let k: String
         switch provider {
+        case "kilo": return true             // Kilo Gateway: free anonymous tier works without a key
         case "claude": k = claudeKeyValue
         case "openai": k = openaiKeyValue
         case "deepseek": k = deepseekKeyValue
+        case "openrouter": k = openrouterKeyValue
         default: k = apiKey                  // minimax
         }
         return !k.trimmingCharacters(in: .whitespaces).isEmpty
@@ -193,7 +205,7 @@ protocol AIBackend: AnyObject {
 //  - openai / deepseek → OpenAI Chat Completions format
 func makeBackend(_ config: AIConfig) -> AIBackend {
     switch config.provider {
-    case "openai", "deepseek": return OpenAIBackend(config: config)
+    case "openai", "deepseek", "openrouter", "kilo": return OpenAIBackend(config: config)
     default: return AnthropicBackend(config: config)   // claude, minimax
     }
 }
@@ -284,13 +296,44 @@ final class OpenAIBackend: AIBackend {
     init(config: AIConfig) { self.config = config }
 
     var isOpenAI: Bool { config.provider == "openai" }
-    var base: String { isOpenAI ? "https://api.openai.com/v1" : "https://api.deepseek.com" }
-    var key: String { isOpenAI ? config.openaiKeyValue : config.deepseekKeyValue }
-    var model: String { isOpenAI ? config.openaiModelValue : config.deepseekModelValue }
-    var name: String { isOpenAI ? "OpenAI" : "DeepSeek" }
+    var isOpenRouter: Bool { config.provider == "openrouter" }
+    var isKilo: Bool { config.provider == "kilo" }
+    var base: String {
+        switch config.provider {
+        case "openai":     return "https://api.openai.com/v1"
+        case "openrouter": return "https://openrouter.ai/api/v1"
+        case "kilo":       return "https://api.kilo.ai/api/gateway"
+        default:           return "https://api.deepseek.com"   // deepseek
+        }
+    }
+    var key: String {
+        switch config.provider {
+        case "openai":     return config.openaiKeyValue
+        case "openrouter": return config.openrouterKeyValue
+        case "kilo":       return config.kiloKeyValue           // may be empty → anonymous
+        default:           return config.deepseekKeyValue
+        }
+    }
+    var model: String {
+        switch config.provider {
+        case "openai":     return config.openaiModelValue
+        case "openrouter": return config.openrouterModelValue
+        case "kilo":       return config.kiloModelValue
+        default:           return config.deepseekModelValue
+        }
+    }
+    var name: String {
+        switch config.provider {
+        case "openai":     return "OpenAI"
+        case "openrouter": return "OpenRouter"
+        case "kilo":       return "Kilo"
+        default:           return "DeepSeek"
+        }
+    }
     var chatURL: String { base + "/chat/completions" }
-    var isConfigured: Bool { !key.trimmingCharacters(in: .whitespaces).isEmpty }
-    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek still uses max_tokens.
+    // Kilo's free tier works anonymously (no key); the others require one.
+    var isConfigured: Bool { isKilo || !key.trimmingCharacters(in: .whitespaces).isEmpty }
+    // OpenAI deprecated max_tokens → max_completion_tokens; DeepSeek/OpenRouter use the standard max_tokens.
     var tokenParam: String { isOpenAI ? "max_completion_tokens" : "max_tokens" }
 
     private func makeRequest(_ body: [String: Any], timeout: TimeInterval) -> URLRequest? {
@@ -299,7 +342,14 @@ final class OpenAIBackend: AIBackend {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
+        if !key.trimmingCharacters(in: .whitespaces).isEmpty {
+            req.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
+        }
+        if isOpenRouter {
+            // Optional headers so the app is identified on OpenRouter's leaderboard.
+            req.setValue("https://github.com/lordmacu/SlimePet", forHTTPHeaderField: "HTTP-Referer")
+            req.setValue("Flubber", forHTTPHeaderField: "X-Title")
+        }
         req.httpBody = payload
         return req
     }
@@ -367,7 +417,7 @@ final class OpenAIBackend: AIBackend {
     }
     func vision(prompt: String, imageBase64: String, completion: @escaping (String?) -> Void) {
         func done(_ s: String?) { DispatchQueue.main.async { completion(s) } }
-        guard isConfigured, isOpenAI else { done(nil); return }   // DeepSeek has no vision
+        guard isConfigured, (isOpenAI || isOpenRouter || isKilo) else { done(nil); return }   // DeepSeek has no vision; OpenRouter/Kilo depend on the model
         let b: [String: Any] = ["model": model, tokenParam: 1024, "temperature": 0.2, "messages": [[
             "role": "user", "content": [
                 ["type": "text", "text": prompt],
