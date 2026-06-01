@@ -1655,7 +1655,10 @@ final class PetView: NSView {
                  color: NSColor(srgbRed: 0.62, green: 0.96, blue: 0.72, alpha: 1))
         let bs: CGFloat = 20, gapb: CGFloat = 4
         var bxr = header.maxX - 8 - bs
-        for (id, icon) in [("close", "✕"), ("new", "＋"), ("list", "☰"), ("eye", "👁️"), ("ear", listening ? "⏹️" : "👂"), ("mic", micOn ? "⏹️" : "🎤")] {
+        var headerBtns: [(String, String)] = [("close", "✕"), ("new", "＋"), ("list", "☰")]
+        if client?.config.supportsVision == true { headerBtns.append(("eye", "👁️")) }   // vision only on paid image-capable APIs
+        headerBtns += [("ear", listening ? "⏹️" : "👂"), ("mic", micOn ? "⏹️" : "🎤")]
+        for (id, icon) in headerBtns {
             let r = NSRect(x: bxr, y: header.minY + 4, width: bs, height: bs)
             let p = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
             NSColor(white: 1, alpha: 0.12).setFill(); p.fill()

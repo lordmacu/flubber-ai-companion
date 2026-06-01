@@ -53,7 +53,9 @@ final class Agent {
     private func step(_ completion: @escaping (String) -> Void) {
         iterations += 1
         if iterations > maxIterations { completion("Uff, me enredé demasiado 😵 ¿lo intentamos de otra forma?"); return }
-        client.completeStream(messages: messages, tools: Agent.tools, maxTokens: 2000,
+        // Hide the screen-vision tool unless the provider's API accepts images (paid vision).
+        let tools = client.config.supportsVision ? Agent.tools : Agent.tools.filter { $0.name != "ver_pantalla" }
+        client.completeStream(messages: messages, tools: tools, maxTokens: 2000,
                               onDelta: { [weak self] chunk in self?.onToken?(chunk) }) { [weak self] result in
             guard let self = self else { return }
             guard let result = result else { completion("Uy, no pude responder 😵‍💫"); return }

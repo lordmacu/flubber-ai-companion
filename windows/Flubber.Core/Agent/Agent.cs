@@ -72,9 +72,14 @@ public sealed class Agent
         else _messages[0] = sys;
         _messages.Add(new AIMessage { Role = "user", Content = userText, ImageBase64 = image });
 
+        // Hide the screen-vision tool unless the provider's API accepts images (paid vision).
+        var tools = _client.Config.SupportsVision
+            ? AgentTools.All
+            : AgentTools.All.Where(t => t.Name != "ver_pantalla").ToList();
+
         for (var iter = 1; iter <= MaxIterations; iter++)
         {
-            var result = await _client.CompleteStreamAsync(_messages, AgentTools.All, 2000, chunk => _onToken(chunk)).ConfigureAwait(false);
+            var result = await _client.CompleteStreamAsync(_messages, tools, 2000, chunk => _onToken(chunk)).ConfigureAwait(false);
             if (result == null) return "Uy, no pude responder 😵‍💫";
 
             if (result.ToolCalls.Count == 0)

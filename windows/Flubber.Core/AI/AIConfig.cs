@@ -80,6 +80,13 @@ public sealed class AIConfig
         }
     }
 
+    /// <summary>
+    /// Vision (screen capture) is only offered by paid providers whose API accepts images.
+    /// Free tiers (Kilo, OpenRouter :free) and DeepSeek don't, so we hide the feature there.
+    /// </summary>
+    [JsonIgnore]
+    public bool SupportsVision => Provider is "claude" or "minimax" or "openai";
+
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     // Secret encryption hooks (filled in by the Windows layer with DPAPI).

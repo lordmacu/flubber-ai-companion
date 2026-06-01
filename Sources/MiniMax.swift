@@ -142,6 +142,15 @@ struct AIConfig: Codable {
         return !k.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Vision (screen capture) is only offered by paid providers whose API accepts images.
+    /// Free tiers (Kilo, OpenRouter :free) and DeepSeek don't, so we hide the feature there.
+    var supportsVision: Bool {
+        switch provider {
+        case "claude", "minimax", "openai": return true
+        default: return false               // kilo, openrouter, deepseek
+        }
+    }
+
     static var fileURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("SlimePet", isDirectory: true)
