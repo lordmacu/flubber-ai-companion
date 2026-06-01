@@ -26,7 +26,7 @@ public static class Tuning
     public const double PoopAfterEatMin = 2.5;  // poop ~2.5 min after eating (and not always)
 
     // Age / evolution (in simulated hours).
-    public const double HatchHours = 0.05;
+    public const double HatchHours = 0.0014;   // egg -> baby (~5 s reales con timeScale=1)
     public const double ChildHours = 6.0;
     public const double AdultHours = 24.0;
 

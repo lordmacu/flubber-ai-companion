@@ -23,7 +23,7 @@ enum Tuning {
     static let poopAfterEatMin  = 2.5     // poop ~2.5 min after eating (and not always)
 
     // Age / evolution (in simulated hours).
-    static let hatchHours       = 0.05    // egg -> baby
+    static let hatchHours       = 0.0014  // egg -> baby (~5 s reales con timeScale=1)
     static let childHours       = 6.0     // baby -> child
     static let adultHours       = 24.0    // child -> adult
 
