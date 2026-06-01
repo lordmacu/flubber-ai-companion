@@ -87,6 +87,7 @@ public sealed class ChatWindow : Window
             Content = _messages,
             Margin = new Thickness(0, 2, 0, 2),
         };
+        ApplyThinScrollbar(_scroll);
 
         // --- input + send ---
         _input = new Controls.TextBox
@@ -96,6 +97,7 @@ public sealed class ChatWindow : Window
             VerticalContentAlignment = VerticalAlignment.Center,
             Background = new Media.SolidColorBrush(InputBg),
             Foreground = Media.Brushes.Black, BorderThickness = new Thickness(0),
+            BorderBrush = Media.Brushes.Transparent, FocusVisualStyle = null,
             Padding = new Thickness(7, 4, 7, 4), FontSize = 12,
         };
         _input.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; _ = SendAsync(); } };
@@ -105,7 +107,7 @@ public sealed class ChatWindow : Window
             Child = _input,
         };
 
-        _send = new Controls.Button { Content = "➤", Width = 34, Foreground = Media.Brushes.White, Cursor = Input.Cursors.Hand };
+        _send = new Controls.Button { Content = "➤", Width = 34, Foreground = Media.Brushes.White, Cursor = Input.Cursors.Hand, FocusVisualStyle = null };
         StyleSendButton(_send);
         _send.Click += (_, _) => _ = SendAsync();
 
@@ -159,7 +161,7 @@ public sealed class ChatWindow : Window
         {
             Content = glyph, Width = 22, Height = 22, Margin = new Thickness(4, 0, 0, 0),
             Foreground = Media.Brushes.White, FontSize = 12, Cursor = Input.Cursors.Hand,
-            BorderThickness = new Thickness(0), Background = BtnBg,
+            BorderThickness = new Thickness(0), Background = BtnBg, FocusVisualStyle = null,
         };
         // Strip the default WPF chrome and give it rounded corners.
         b.Template = RoundButtonTemplate(4);
@@ -175,11 +177,14 @@ public sealed class ChatWindow : Window
         b.Template = RoundButtonTemplate(6);
     }
 
-    /// <summary>A minimal button template: a rounded Border that shows the content, no native chrome.</summary>
+    /// <summary>
+    /// A minimal button template: a rounded Border with no native chrome, plus
+    /// hover/pressed/disabled feedback via opacity (works for any base color).
+    /// </summary>
     private static System.Windows.Controls.ControlTemplate RoundButtonTemplate(double radius)
     {
         var t = new Controls.ControlTemplate(typeof(Controls.Button));
-        var border = new FrameworkElementFactory(typeof(Controls.Border));
+        var border = new FrameworkElementFactory(typeof(Controls.Border)) { Name = "bd" };
         border.SetValue(Controls.Border.CornerRadiusProperty, new CornerRadius(radius));
         border.SetBinding(Controls.Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
         var content = new FrameworkElementFactory(typeof(Controls.ContentPresenter));
@@ -187,7 +192,59 @@ public sealed class ChatWindow : Window
         content.SetValue(Controls.ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
         border.AppendChild(content);
         t.VisualTree = border;
+
+        void OpacityTrigger(DependencyProperty prop, object on, double opacity)
+        {
+            var tr = new Trigger { Property = prop, Value = on };
+            tr.Setters.Add(new Setter(UIElement.OpacityProperty, opacity, "bd"));
+            t.Triggers.Add(tr);
+        }
+        OpacityTrigger(UIElement.IsMouseOverProperty, true, 0.82);
+        OpacityTrigger(Controls.Primitives.ButtonBase.IsPressedProperty, true, 0.6);
+        OpacityTrigger(UIElement.IsEnabledProperty, false, 0.4);
         return t;
+    }
+
+    /// <summary>Replaces the native scrollbar with a thin, dark, rounded overlay-style bar to match macOS.</summary>
+    private static void ApplyThinScrollbar(Controls.ScrollViewer sv)
+    {
+        const string xaml = @"
+<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+       xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'>
+  <Setter Property='Width' Value='8'/>
+  <Setter Property='Background' Value='Transparent'/>
+  <Setter Property='Template'>
+    <Setter.Value>
+      <ControlTemplate TargetType='ScrollBar'>
+        <Grid Background='Transparent'>
+          <Track Name='PART_Track' IsDirectionReversed='True'>
+            <Track.Thumb>
+              <Thumb>
+                <Thumb.Template>
+                  <ControlTemplate TargetType='Thumb'>
+                    <Border CornerRadius='4' Background='#55FFFFFF' Margin='2,0,2,0'/>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Track.Thumb>
+            <Track.IncreaseRepeatButton>
+              <RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/>
+            </Track.IncreaseRepeatButton>
+            <Track.DecreaseRepeatButton>
+              <RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/>
+            </Track.DecreaseRepeatButton>
+          </Track>
+        </Grid>
+      </ControlTemplate>
+    </Setter.Value>
+  </Setter>
+</Style>";
+        try
+        {
+            if (System.Windows.Markup.XamlReader.Parse(xaml) is Style s)
+                sv.Resources[typeof(Controls.Primitives.ScrollBar)] = s;
+        }
+        catch { /* fall back to the default scrollbar — never break the chat */ }
     }
 
     /// <summary>Attaches a capture (draws it and persists it on the last user message).</summary>
