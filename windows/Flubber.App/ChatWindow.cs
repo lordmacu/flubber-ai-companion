@@ -1,24 +1,42 @@
 using System.Windows;
+using System.Windows.Input;
+using Input = System.Windows.Input;
 using Flubber.Core;
 using Flubber.Core.Agent;
 using Controls = System.Windows.Controls;
 using Media = System.Windows.Media;
+using Effects = System.Windows.Media.Effects;
 using WpfAlign = System.Windows.HorizontalAlignment;
 
 namespace Flubber.App;
 
-/// <summary>Chat window with token-by-token streaming + conversation persistence.</summary>
+/// <summary>
+/// Chat window with token-by-token streaming + conversation persistence.
+/// Borderless + transparent + custom-painted to match the macOS chat overlay
+/// (drawChat in main.swift): dark rounded panel, green border, monospaced bubbles.
+/// </summary>
 public sealed class ChatWindow : Window
 {
+    // Colors copied 1:1 from the macOS drawChat() so both platforms look identical.
+    private static readonly Media.Color PanelBg     = Media.Color.FromRgb(0x29, 0x29, 0x29);   // white 0.16
+    private static readonly Media.Color PanelBorder = Media.Color.FromRgb(0x5C, 0xD9, 0x8C);   // green accent
+    private static readonly Media.Color HeaderName  = Media.Color.FromRgb(0x9E, 0xF5, 0xB8);   // bright green
+    private static readonly Media.Color UserBubble  = Media.Color.FromRgb(0x33, 0x6B, 0xC7);   // blue 0.20,0.42,0.78
+    private static readonly Media.Color BotBubble   = Media.Color.FromRgb(0x33, 0x8C, 0x61);   // green 0.20,0.55,0.38
+    private static readonly Media.Color InputBg     = Media.Color.FromRgb(0xF2, 0xF2, 0xF2);   // white 0.95
+    private static readonly Media.Color SendBlue    = Media.Color.FromRgb(0x4C, 0xA8, 0xFA);   // 0.30,0.66,0.98
+    private static readonly Media.Brush BtnBg       = new Media.SolidColorBrush(Media.Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF)); // white 12%
+    private static readonly Media.FontFamily Mono   = new("Consolas, Cascadia Mono, Courier New");
+
     private readonly Agent _agent;
     private readonly ConversationStore _store;
     private Conversation _conv;
 
-    private readonly Controls.StackPanel _messages = new() { Margin = new Thickness(10) };
+    private readonly Controls.StackPanel _messages = new() { Margin = new Thickness(8, 6, 8, 6) };
     private readonly Controls.ScrollViewer _scroll;
     private readonly Controls.TextBox _input;
     private readonly Controls.Button _send;
-    private readonly Controls.TextBlock _status = new() { Margin = new Thickness(12, 0, 12, 4), Foreground = Media.Brushes.Gray, FontSize = 11 };
+    private readonly Controls.TextBlock _status = new() { Margin = new Thickness(10, 0, 10, 2), Foreground = new Media.SolidColorBrush(Media.Color.FromRgb(0xAA, 0xAA, 0xAA)), FontSize = 11 };
     private bool _busy;
 
     public ChatWindow(Agent agent)
@@ -28,49 +46,100 @@ public sealed class ChatWindow : Window
         _conv = _store.Conversations.Count > 0 ? _store.Conversations[^1] : Conversation.New();
         if (_store.Conversations.Count == 0) _store.Conversations.Add(_conv);
 
-        Title = "Flubber 💬";
-        Width = 420; Height = 560;
+        // Borderless, transparent shell — no native chrome.
+        Title = "Flubber";
+        Width = 372; Height = 500;
+        WindowStyle = WindowStyle.None;
+        AllowsTransparency = true;
+        Background = Media.Brushes.Transparent;
+        ResizeMode = ResizeMode.NoResize;
+        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = new Media.SolidColorBrush(Media.Color.FromRgb(0xF7, 0xF7, 0xF8));
 
+        // --- header: name + buttons (draggable) ---
+        var name = new Controls.TextBlock
+        {
+            Text = $"{(string.IsNullOrEmpty(_conv.Title) ? "Flubber" : _conv.Title)} 💬",
+            Foreground = new Media.SolidColorBrush(HeaderName),
+            FontWeight = FontWeights.SemiBold, FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0),
+        };
+        var newBtn = HeaderButton("＋", () => NewConversation());
+        var closeBtn = HeaderButton("✕", Close);
+        var btnRow = new Controls.StackPanel { Orientation = Controls.Orientation.Horizontal, HorizontalAlignment = WpfAlign.Right };
+        btnRow.Children.Add(newBtn);
+        btnRow.Children.Add(closeBtn);
+
+        var header = new Controls.DockPanel { Height = 28, Margin = new Thickness(2, 2, 2, 2), Background = Media.Brushes.Transparent };
+        Controls.DockPanel.SetDock(btnRow, Controls.Dock.Right);
+        header.Children.Add(btnRow);
+        header.Children.Add(name);
+        header.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
+        _headerName = name;
+
+        // separator under header
+        var sep = new Controls.Border { Height = 1, Background = BtnBg, Margin = new Thickness(2, 0, 2, 0) };
+
+        // --- messages ---
         _scroll = new Controls.ScrollViewer
         {
             VerticalScrollBarVisibility = Controls.ScrollBarVisibility.Auto,
             Content = _messages,
+            Margin = new Thickness(0, 2, 0, 2),
         };
 
+        // --- input + send ---
         _input = new Controls.TextBox
         {
-            Margin = new Thickness(10, 4, 6, 10), MinHeight = 30, MaxHeight = 90,
-            TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, VerticalContentAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 4, 4, 4), MinHeight = 28, MaxHeight = 110,
+            TextWrapping = TextWrapping.Wrap, AcceptsReturn = false,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = new Media.SolidColorBrush(InputBg),
+            Foreground = Media.Brushes.Black, BorderThickness = new Thickness(0),
+            Padding = new Thickness(7, 4, 7, 4), FontSize = 12,
         };
-        _input.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { e.Handled = true; _ = SendAsync(); } };
+        _input.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; _ = SendAsync(); } };
+        var inputBorder = new Controls.Border
+        {
+            CornerRadius = new CornerRadius(5), Background = new Media.SolidColorBrush(InputBg),
+            Child = _input,
+        };
 
-        _send = new Controls.Button { Content = "➤", Width = 44, Margin = new Thickness(0, 4, 10, 10) };
+        _send = new Controls.Button { Content = "➤", Width = 34, Foreground = Media.Brushes.White, Cursor = Input.Cursors.Hand };
+        StyleSendButton(_send);
         _send.Click += (_, _) => _ = SendAsync();
 
-        var inputRow = new Controls.DockPanel();
+        var inputRow = new Controls.DockPanel { Margin = new Thickness(6, 2, 6, 6) };
         Controls.DockPanel.SetDock(_send, Controls.Dock.Right);
+        _send.Margin = new Thickness(4, 0, 0, 0);
         inputRow.Children.Add(_send);
-        inputRow.Children.Add(_input);
+        inputRow.Children.Add(inputBorder);
 
         var bottom = new Controls.StackPanel();
         bottom.Children.Add(_status);
         bottom.Children.Add(inputRow);
 
-        var topBar = new Controls.DockPanel { Margin = new Thickness(8, 6, 8, 0) };
-        var newBtn = new Controls.Button { Content = Loc.T("＋ Nueva", "＋ New"), Padding = new Thickness(8, 2, 8, 2) };
-        newBtn.Click += (_, _) => NewConversation();
-        Controls.DockPanel.SetDock(newBtn, Controls.Dock.Left);
-        topBar.Children.Add(newBtn);
-
-        var root = new Controls.DockPanel();
+        // --- assemble panel ---
+        var root = new Controls.DockPanel { Margin = new Thickness(6, 4, 6, 6) };
+        Controls.DockPanel.SetDock(header, Controls.Dock.Top);
+        Controls.DockPanel.SetDock(sep, Controls.Dock.Top);
         Controls.DockPanel.SetDock(bottom, Controls.Dock.Bottom);
-        Controls.DockPanel.SetDock(topBar, Controls.Dock.Top);
+        root.Children.Add(header);
+        root.Children.Add(sep);
         root.Children.Add(bottom);
-        root.Children.Add(topBar);
         root.Children.Add(_scroll);
-        Content = root;
+
+        var panel = new Controls.Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = new Media.SolidColorBrush(PanelBg),
+            BorderBrush = new Media.SolidColorBrush(PanelBorder),
+            BorderThickness = new Thickness(2),
+            Margin = new Thickness(10),   // room for the drop shadow
+            Effect = new Effects.DropShadowEffect { BlurRadius = 16, ShadowDepth = 0, Opacity = 0.5, Color = Media.Colors.Black },
+            Child = root,
+        };
+        Content = panel;
 
         foreach (var m in _conv.Messages)
         {
@@ -79,6 +148,46 @@ public sealed class ChatWindow : Window
         }
         _agent.SeedHistory(_conv.Messages.Select(m => (m.Role, m.Content)));   // LLM memory
         Loaded += (_, _) => _input.Focus();
+    }
+
+    private readonly Controls.TextBlock _headerName;
+
+    /// <summary>Small translucent rounded header button (close / new), matching the macOS HUD buttons.</summary>
+    private Controls.Button HeaderButton(string glyph, Action onClick)
+    {
+        var b = new Controls.Button
+        {
+            Content = glyph, Width = 22, Height = 22, Margin = new Thickness(4, 0, 0, 0),
+            Foreground = Media.Brushes.White, FontSize = 12, Cursor = Input.Cursors.Hand,
+            BorderThickness = new Thickness(0), Background = BtnBg,
+        };
+        // Strip the default WPF chrome and give it rounded corners.
+        b.Template = RoundButtonTemplate(4);
+        b.Click += (_, _) => onClick();
+        return b;
+    }
+
+    private void StyleSendButton(Controls.Button b)
+    {
+        b.Background = new Media.SolidColorBrush(SendBlue);
+        b.BorderThickness = new Thickness(0);
+        b.FontSize = 13;
+        b.Template = RoundButtonTemplate(6);
+    }
+
+    /// <summary>A minimal button template: a rounded Border that shows the content, no native chrome.</summary>
+    private static System.Windows.Controls.ControlTemplate RoundButtonTemplate(double radius)
+    {
+        var t = new Controls.ControlTemplate(typeof(Controls.Button));
+        var border = new FrameworkElementFactory(typeof(Controls.Border));
+        border.SetValue(Controls.Border.CornerRadiusProperty, new CornerRadius(radius));
+        border.SetBinding(Controls.Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+        var content = new FrameworkElementFactory(typeof(Controls.ContentPresenter));
+        content.SetValue(Controls.ContentPresenter.HorizontalAlignmentProperty, WpfAlign.Center);
+        content.SetValue(Controls.ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(content);
+        t.VisualTree = border;
+        return t;
     }
 
     /// <summary>Attaches a capture (draws it and persists it on the last user message).</summary>
@@ -118,20 +227,25 @@ public sealed class ChatWindow : Window
         _messages.Children.Clear();
         _agent.Reset();
         _status.Text = "";
+        _headerName.Text = $"{(string.IsNullOrEmpty(_conv.Title) ? "Flubber" : _conv.Title)} 💬";
         _input.Focus();
     }
 
     private Controls.TextBlock AddBubble(string role, string text)
     {
         var isUser = role == "user";
-        var tb = new Controls.TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = isUser ? Media.Brushes.White : Media.Brushes.Black };
+        var tb = new Controls.TextBlock
+        {
+            Text = text, TextWrapping = TextWrapping.Wrap,
+            Foreground = Media.Brushes.White, FontFamily = Mono, FontSize = 12,
+        };
         var border = new Controls.Border
         {
-            Background = isUser ? new Media.SolidColorBrush(Media.Color.FromRgb(0x2E, 0x7D, 0xF6)) : new Media.SolidColorBrush(Media.Color.FromRgb(0xEA, 0xEA, 0xEC)),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10, 7, 10, 7),
-            Margin = new Thickness(0, 4, 0, 4),
-            MaxWidth = 320,
+            Background = new Media.SolidColorBrush(isUser ? UserBubble : BotBubble),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 3, 0, 3),
+            MaxWidth = 280,
             HorizontalAlignment = isUser ? WpfAlign.Right : WpfAlign.Left,
             Child = tb,
         };
@@ -152,6 +266,7 @@ public sealed class ChatWindow : Window
         _messages.Children.Clear();
         _agent.Reset();
         _status.Text = "";
+        _headerName.Text = $"{title} 💬";
     }
 
     /// <summary>Adds a message from the slime and persists it.</summary>
@@ -165,18 +280,18 @@ public sealed class ChatWindow : Window
     /// <summary>Adds a clickable bubble that opens a file (the transcript) and persists it.</summary>
     public void AppendFileLink(string label, string filePath)
     {
-        var tb = new Controls.TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = Media.Brushes.Black, FontWeight = FontWeights.SemiBold };
+        var tb = new Controls.TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = Media.Brushes.White, FontFamily = Mono, FontSize = 12, FontWeight = FontWeights.SemiBold };
         var border = new Controls.Border
         {
-            Background = new Media.SolidColorBrush(Media.Color.FromRgb(0xDD, 0xF3, 0xE3)),
-            BorderBrush = new Media.SolidColorBrush(Media.Color.FromRgb(0x36, 0xC4, 0x6E)),
+            Background = new Media.SolidColorBrush(BotBubble),
+            BorderBrush = new Media.SolidColorBrush(PanelBorder),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10, 7, 10, 7),
-            Margin = new Thickness(0, 4, 0, 4),
-            MaxWidth = 320,
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 3, 0, 3),
+            MaxWidth = 280,
             HorizontalAlignment = WpfAlign.Left,
-            Cursor = System.Windows.Input.Cursors.Hand,
+            Cursor = Input.Cursors.Hand,
             Child = tb,
         };
         border.MouseLeftButtonUp += (_, _) =>
