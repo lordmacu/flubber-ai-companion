@@ -24,8 +24,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key>            <string>Flubber</string>
     <key>CFBundleDisplayName</key>     <string>Flubber</string>
     <key>CFBundleIdentifier</key>      <string>co.cristiangarcia.slimepet</string>
-    <key>CFBundleVersion</key>         <string>1.6.0</string>
-    <key>CFBundleShortVersionString</key> <string>1.6.0</string>
+    <key>CFBundleVersion</key>         <string>1.6.1</string>
+    <key>CFBundleShortVersionString</key> <string>1.6.1</string>
     <key>CFBundlePackageType</key>     <string>APPL</string>
     <key>CFBundleExecutable</key>      <string>Flubber</string>
     <key>CFBundleIconFile</key>        <string>AppIcon</string>
